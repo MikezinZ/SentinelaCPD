@@ -1,0 +1,28 @@
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: mysql_iot
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  emqx:
+    image: emqx/emqx-enterprise:latest
+    container_name: emqx_broker
+    restart: always
+    ports:
+      - "18083:18083" # Dashboard Web
+      - "1883:1883"   # Porta MQTT padrão
+      - "8083:8083"   # MQTT sobre WebSocket
+      - "8883:8883"   # MQTT com SSL/TLS
+    depends_on:
+      - mysql
+
+volumes:
+  mysql_data:
