@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="scroll-smooth">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema IoT de Telemetria e Monitoramento de CPD</title>
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-slate-950 text-slate-100 font-sans antialiased">
+
+    <!-- Header & Menu de Navegação -->
+    <header class="sticky top-0 z-50 bg-slate-900/90 backdrop-blur border-b border-slate-800">
+        <div class="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+            <span class="text-xl font-bold tracking-tight text-emerald-400">SISTEMA IoT MONITORAMENTO</span>
+            <nav class="flex gap-6 text-sm font-medium">
+                <a href="#home" class="hover:text-emerald-400 transition">Home</a>
+                <a href="#plataforma" class="hover:text-emerald-400 transition">Plataforma</a>
+                <a href="#dispositivo" class="hover:text-emerald-400 transition">Dispositivo</a>
+                <a href="#aplicativo" class="hover:text-emerald-400 transition">Aplicativo</a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- 1. Home -->
+    <section id="home" class="py-20 px-6 border-b border-slate-800">
+        <div class="max-w-4xl mx-auto text-center">
+            <span
+                class="inline-block py-1 px-3 mb-4 text-xs font-semibold text-emerald-300 bg-emerald-950/60 rounded-full border border-emerald-800">
+                Projeto Integrador 6 • N1 Concluída
+            </span>
+            <h1 class="text-4xl md:text-5xl font-extrabold tracking-tight mb-6">
+                Monitoramento Térmico e de Corrente para CPD
+            </h1>
+            <p class="text-slate-400 text-lg leading-relaxed mb-8">
+                Sistema inteligente ponta a ponta voltado para telemetria em tempo real de infraestruturas de TI
+                críticas.
+                Mede temperatura, umidade relativa e corrente elétrica eficaz (RMS) com transmissão segura via broker
+                MQTT EMQX
+                e persistência relacional automatizada em banco de dados MySQL.
+            </p>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-left mt-10">
+                <div class="p-5 rounded-xl bg-slate-900 border border-slate-800">
+                    <div class="text-emerald-400 font-bold mb-1">Telemetria Climática</div>
+                    <div class="text-sm text-slate-400">Acompanhamento contínuo de temperatura e umidade com sensor
+                        digital DHT22.</div>
+                </div>
+                <div class="p-5 rounded-xl bg-slate-900 border border-slate-800">
+                    <div class="text-emerald-400 font-bold mb-1">Medição Elétrica RMS</div>
+                    <div class="text-sm text-slate-400">Transformador de corrente ZMCT103C com amostragem em 60Hz e
+                        isolamento galvânico.</div>
+                </div>
+                <div class="p-5 rounded-xl bg-slate-900 border border-slate-800">
+                    <div class="text-emerald-400 font-bold mb-1">Arquitetura de Borda</div>
+                    <div class="text-sm text-slate-400">Ingestão via Docker (EMQX + MySQL) com controle de acesso e
+                        regras em tempo real.</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 2. Plataforma -->
+    <section id="plataforma" class="py-20 px-6 border-b border-slate-800">
+        <div class="max-w-5xl mx-auto">
+            <h2 class="text-3xl font-bold mb-4">Plataforma IoT e Integração</h2>
+            <p class="text-slate-400 mb-10 leading-relaxed">
+                A plataforma de backend é conteinerizada com Docker Compose, orquestrando um broker MQTT industrial e um
+                banco de dados relacional sem dependência de serviços externos em nuvem.
+            </p>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
+                <div class="p-6 rounded-xl bg-slate-900 border border-slate-800">
+                    <h3 class="text-lg font-bold text-emerald-400 mb-3">Broker MQTT (EMQX 5.x)</h3>
+                    <ul class="text-sm text-slate-400 space-y-2 list-disc list-inside">
+                        <li>Porta 1883 ativa em rede privada local com autenticação por credenciais.</li>
+                        <li>Dashboard administrativo acessível em <code
+                                class="text-slate-200">http://localhost:18083</code>.</li>
+                        <li>Motor de regras SQL para extração e mapeamento dos payloads JSON.</li>
+                        <li>Conector nativo Data Bridge disparando operações assíncronas no MySQL.</li>
+                    </ul>
+                </div>
+                <div class="p-6 rounded-xl bg-slate-900 border border-slate-800">
+                    <h3 class="text-lg font-bold text-emerald-400 mb-3">Banco de Dados (MySQL 8.0)</h3>
+                    <ul class="text-sm text-slate-400 space-y-2 list-disc list-inside">
+                        <li>Esquema estruturado <code class="text-slate-200">iot_db</code> com controle de transações.
+                        </li>
+                        <li>Tabela <code class="text-slate-200">leituras_dht22</code> com colunas de temperatura,
+                            umidade e corrente.</li>
+                        <li>Gestão visual direta via MySQL Workbench na porta 3306.</li>
+                        <li>Histórico auditável com registro automático de data e hora no servidor.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="p-6 rounded-xl bg-slate-900/60 border border-slate-800">
+                <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider mb-3">Estrutura do Payload
+                    Telemetria</h3>
+                <pre class="bg-black/60 p-4 rounded-lg text-emerald-400 font-mono text-xs overflow-x-auto">
+{
+  "temperatura": 31.0,
+  "umidade": 66.8,
+  "corrente": 0.12
+}</pre>
+            </div>
+        </div>
+    </section>
+
+    <!-- 3. Dispositivo -->
+    <section id="dispositivo" class="py-20 px-6 border-b border-slate-800">
+        <div class="max-w-5xl mx-auto">
+            <h2 class="text-3xl font-bold mb-4">Dispositivos e Circuito de Borda</h2>
+            <p class="text-slate-400 mb-10 leading-relaxed">
+                A camada física foi projetada sobre o microcontrolador ESP32 DevKit v1, assegurando estabilidade
+                elétrica com alimentação compartilhada em barramento e separação de canais de amostragem.
+            </p>
+
+            <div class="overflow-x-auto mb-10">
+                <table class="w-full text-left text-sm border border-slate-800 rounded-lg overflow-hidden">
+                    <thead class="bg-slate-900 text-slate-300 uppercase text-xs font-semibold">
+                        <tr>
+                            <th class="p-4">Dispositivo</th>
+                            <th class="p-4">Função</th>
+                            <th class="p-4">Pino ESP32</th>
+                            <th class="p-4">Tipo de Interface</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800 text-slate-400">
+                        <tr>
+                            <td class="p-4 font-medium text-slate-200">ESP32 DevKit v1</td>
+                            <td class="p-4">Processamento, cálculo RMS e conexão Wi-Fi</td>
+                            <td class="p-4">-</td>
+                            <td class="p-4">SoC Xtensa Dual-Core</td>
+                        </tr>
+                        <tr>
+                            <td class="p-4 font-medium text-slate-200">Sensor DHT22</td>
+                            <td class="p-4">Monitoramento térmico e umidade ambiente</td>
+                            <td class="p-4">GPIO 27</td>
+                            <td class="p-4">Digital Single-Bus</td>
+                        </tr>
+                        <tr>
+                            <td class="p-4 font-medium text-slate-200">Módulo ZMCT103C</td>
+                            <td class="p-4">Leitura de corrente alternada não invasiva</td>
+                            <td class="p-4">GPIO 34 (ADC1)</td>
+                            <td class="p-4">Analógico com Offset DC</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="p-6 rounded-xl bg-slate-900 border border-slate-800">
+                <h3 class="text-lg font-bold text-emerald-400 mb-2">Cuidados Técnicos de Montagem</h3>
+                <p class="text-sm text-slate-400 leading-relaxed">
+                    O pino de leitura analógica do ZMCT103C foi estrategicamente alocado no <strong>GPIO 34
+                        (ADC1)</strong> para impedir qualquer interferência de chaveamento do rádio Wi-Fi integrado da
+                    placa. O isolamento galvânico do transformador de corrente garante segurança total contra surtos da
+                    rede de 220V em direção à lógica digital.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- 4. Aplicativo -->
+    <section id="aplicativo" class="py-20 px-6">
+        <div class="max-w-5xl mx-auto">
+            <h2 class="text-3xl font-bold mb-4">Aplicativo e Camada de Apresentação</h2>
+            <p class="text-slate-400 mb-10 leading-relaxed">
+                Interface de auditoria e perspectivas de expansão da interface com o usuário final.
+            </p>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="p-6 rounded-xl bg-slate-900 border border-slate-800">
+                    <h3 class="text-lg font-bold text-emerald-400 mb-2">Painel de Auditoria (Workbench)</h3>
+                    <p class="text-sm text-slate-400 mb-4 leading-relaxed">
+                        Na versão inicial (N1), a validação e auditoria dos registros ocorrem visualmente através do
+                        MySQL Workbench via consultas SQL otimizadas com indexação temporal.
+                    </p>
+                    <span
+                        class="inline-block px-3 py-1 bg-emerald-950/80 text-emerald-400 text-xs font-semibold rounded border border-emerald-800">
+                        Validação N1 Homologada
+                    </span>
+                </div>
+                <div class="p-6 rounded-xl bg-slate-900 border border-slate-800">
+                    <h3 class="text-lg font-bold text-slate-200 mb-2">Front-end / App Mobile (N2)</h3>
+                    <p class="text-sm text-slate-400 mb-4 leading-relaxed">
+                        Para a N2, será desenvolvido um dashboard web responsivo com gráficos temporais contínuos
+                        (Chart.js), alertas de limite crítico de temperatura e cálculo de consumo acumulado em kWh.
+                    </p>
+                    <span
+                        class="inline-block px-3 py-1 bg-slate-800 text-slate-400 text-xs font-semibold rounded border border-slate-700">
+                        Planejamento N2
+                    </span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="py-8 border-t border-slate-800 text-center text-xs text-slate-600">
+        Projeto Integrador 6 • Engenharia da Computação • 2026.2
+    </footer>
+
+</body>
+
+</html>
