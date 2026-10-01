@@ -24,4 +24,12 @@ docker/mysql_data/
 
 # Arquivos do sistema operacional macOS / Linux
 .DS_Store
+
 ._*
+
+*.env
+.env
+
+# Credenciais 
+firmware/config.h
+
