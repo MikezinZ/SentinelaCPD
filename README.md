@@ -14,7 +14,8 @@
 ![Docker](https://img.shields.io/badge/Infra-Docker%20Compose-2496ED?logo=docker&logoColor=white)
 ![License](https://img.shields.io/badge/Licen%C3%A7a-MIT-green)
 
-**🔗 GitPage:** `https://<seu-usuario>.github.io/SentinelaCPD/`
+**🔗 GitPage:** [mikezinz.github.io/SentinelaCPD](https://mikezinz.github.io/SentinelaCPD/)  
+**📦 Repositório:** [github.com/MikezinZ/SentinelaCPD](https://github.com/MikezinZ/SentinelaCPD)
 
 ---
 
@@ -24,7 +25,7 @@ O SentinelaCPD concluiu sua **primeira etapa de validação física e arquitetur
 
 Nesta etapa, a plataforma coleta temperatura e umidade e calcula a corrente alternada eficaz ($I_{\text{RMS}}$) em um circuito de 220 V AC. Os dados seguem de um nó ESP32 até um broker MQTT (EMQX) em Docker e são gravados em um banco MySQL, onde podem ser consultados para auditoria.
 
-A N1 é **uma parte do projeto**. Itens como alimentação por bateria, dashboard e alertas estão no [roadmap](#-roadmap-rumo-à-n2).
+A N1 é **uma parte do projeto**. Itens como alimentação por bateria, dashboard e alertas estão no [roadmap](#roadmap-rumo-à-n2).
 
 ---
 
@@ -32,7 +33,7 @@ A N1 é **uma parte do projeto**. Itens como alimentação por bateria, dashboar
 
 1. [Por que o SentinelaCPD?](#por-que-o-sentinelacpd)
 2. [Motivação de engenharia](#motivação-de-engenharia)
-3. [Stack tecnológica](#-stack-tecnológica)
+3. [Stack tecnológica](#stack-tecnológica)
 4. [Visão do sistema e arquitetura](#visão-do-sistema-e-arquitetura)
 5. [Fundamentação matemática: RMS](#fundamentação-matemática-cálculo-discreto-de-rms)
 6. [Hardware e pinagem](#hardware-e-pinagem)
@@ -41,7 +42,7 @@ A N1 é **uma parte do projeto**. Itens como alimentação por bateria, dashboar
 9. [Princípios de engenharia](#princípios-de-engenharia-adotados)
 10. [Organização do repositório](#organização-do-repositório)
 11. [Como reproduzir](#como-reproduzir-o-projeto)
-12. [Roadmap](#-roadmap-rumo-à-n2)
+12. [Roadmap](#roadmap-rumo-à-n2)
 13. [Licença](#licença-e-agradecimentos)
 
 ---
@@ -74,13 +75,13 @@ Três pilares sustentam o trabalho:
 
 ---
 
-## 🧰 Stack tecnológica
+## Stack tecnológica
 
 | Camada | Tecnologia | Papel no projeto |
 | --- | --- | --- |
 | **Hardware** | ESP32-WROOM-32 (placa com suporte 18650), DHT22 (AM2302), ZMCT103C | Microcontrolador dual-core com Wi-Fi e sensores de temperatura, umidade e corrente AC |
-| **Firmware** | C++ (Arduino Core / Arduino IDE), FreeRTOS | Amostragem, cálculo de RMS, formatação do payload e conexão de rede |
-| **Cliente MQTT** | PubSubClient | Publicação no broker com reconexão automática |
+| **Firmware** | C++ (Arduino Core, que roda sobre FreeRTOS) | Amostragem, cálculo de RMS, formatação do payload e conexão de rede |
+| **Bibliotecas** | `WiFi` / `WiFiMulti`, `PubSubClient`, `DHT` (`DHT.h`) | Conexão Wi-Fi multi-SSID, cliente MQTT e leitura do DHT22 |
 | **Formato de dados** | JSON | Payload leve com temperatura, umidade e corrente |
 | **Mensageria** | MQTT 3.1.1 sobre TCP (porta 1883), EMQX 5.x | Broker local, autenticação de dispositivo e regras SQL |
 | **Persistência** | MySQL 8.0 | Armazenamento relacional de séries temporais |
@@ -114,7 +115,7 @@ O SentinelaCPD é um **pipeline de dados contínuo**, projetado para:
                                 │
                                 ▼
                      Processamento de Borda
-                  (ESP32-WROOM-32 · FreeRTOS)
+                  (ESP32-WROOM-32)
                                 │  Wi-Fi · MQTT (TCP 1883)
                                 ▼  tópico: esp32/telemetria
                    Broker MQTT em Rede Local
@@ -140,7 +141,7 @@ O SentinelaCPD é um **pipeline de dados contínuo**, projetado para:
                                   ▼
 +-------------------------------------------------------------------+
 |                   Camada de Borda (Edge Processing)               |
-|                  ESP32 dual-core @ 240 MHz · FreeRTOS             |
+|                  ESP32 dual-core @ 240 MHz                        |
 |   - Janela de 200 ms (~12 ciclos de 60 Hz) - Cálculo RMS          |
 |   - Supressão de ruído do ADC              - Wi-Fi multi-SSID     |
 +---------------------------------+---------------------------------+
@@ -171,9 +172,9 @@ $$I_{\text{RMS}} = \sqrt{\frac{1}{N} \sum_{i=1}^{N} (x_i - \mu)^2} \cdot K$$
 
 Em que:
 
-* $N$: número de amostras na janela de $200\text{ ms}$ (taxa aproximada de $5\text{ kHz}$);
+* $N$: número de amostras na janela de $200\text{ ms}$ (taxa aproximada de $4$ a $5\text{ kHz}$, limitada pelo tempo de cada leitura do ADC);
 * $x_i$: leitura bruta do ADC de 12 bits ($0$ a $4095$);
-* $\mu$: nível médio de polarização (*offset* DC, em torno de 1680);
+* $\mu$: média das amostras da própria janela, que remove o *offset* DC de polarização (observado em torno de 1680);
 * $K$: constante de calibração que converte o valor do ADC em ampères. Ela depende da relação do transformador, do resistor de carga e do ganho do condicionamento de sinal, e é ajustada empiricamente.
 
 ### Supressão de piso de ruído
@@ -182,6 +183,8 @@ Com carga em repouso, o ADC do ESP32 ainda apresenta flutuações (ruído de qua
 
 $$\text{Se } \sigma_{\text{ADC}} < 18{,}0 \implies I_{\text{RMS}} = 0{,}00\text{ A}$$
 
+Com $K = 0{,}00055$ (valor de exemplo em `config.example.h`), esse limiar equivale a cerca de $0{,}0099\text{ A}$. Quando o ruído oscila logo acima dele, o sistema registra um piso residual de ~`0.01 A`, que é **ruído do ADC e não corrente real**.
+
 ---
 
 ## Hardware e pinagem
@@ -189,8 +192,8 @@ $$\text{Se } \sigma_{\text{ADC}} < 18{,}0 \implies I_{\text{RMS}} = 0{,}00\text{
 | Módulo | Interface elétrica | Pino ESP32 | Observações |
 | --- | --- | --- | --- |
 | **ESP32-WROOM-32** (placa com suporte 18650) | MCU / Wi-Fi | Micro-USB | Na N1, alimentação e gravação via USB. O suporte 18650 e o circuito de carga da placa **não são usados** nesta etapa. |
-| **DHT22 (AM2302)** | Digital, 1 fio | **GPIO 27** | O módulo de 3 pinos já inclui o resistor de pull-up. No sensor de 4 pinos, use pull-up externo de 4,7 a 10 kΩ. Leitura a cada 5 s. |
-| **ZMCT103C** | Analógico com offset DC | **GPIO 34 (ADC1)** | ADC1 evita conflito com o rádio Wi-Fi. A saída do módulo **não pode passar de 3,3 V** no pino do ESP32. |
+| **DHT22 (AM2302)** | Digital, 1 fio | **GPIO 27** | O módulo de 3 pinos já inclui o resistor de pull-up. No sensor de 4 pinos, use pull-up externo de 4,7 a 10 kΩ. Leitura a cada 5 s. Prefira alimentar em 3,3 V, para que o nível do pino de dados não ultrapasse 3,3 V no ESP32. |
+| **ZMCT103C** | Analógico com offset DC | **GPIO 34 (ADC1)** | ADC1 evita conflito com o rádio Wi-Fi. A saída do módulo **não pode passar de 3,3 V** no pino do ESP32. Confira com multímetro a tensão no ponto médio da saída. |
 | **Barramento de alimentação** | DC | 3V3 / 5V / GND | Trilhas dedicadas da protoboard. |
 | **Circuito AC (220 V)** | Acoplamento magnético | Isolado | Apenas o condutor **fase** atravessa o toroide. O sensor não faz contato elétrico com o circuito. |
 
@@ -257,11 +260,11 @@ ORDER BY id;
 +-----+----------------+-------------------+-------------+---------+----------+---------------------+
 ```
 
-* **Sem carga:** a corrente ficou em um piso residual de `0.01 A` (registros 683 a 688).
+* **Sem carga:** a corrente ficou em um piso residual de `0.01 A` (registros 683 a 688), que corresponde ao [piso de ruído do ADC](#supressão-de-piso-de-ruído).
 * **Transição:** ao ligar a carga, a leitura passou por `0.03 A` (registro 689) e estabilizou em `0.08 A` a partir do registro 690.
 * **Ambiente:** temperatura em torno de `24.3 °C` e umidade em torno de `57 %`, com leituras regulares a cada 5 s e sem perda de registros no trecho mostrado.
 
-> Os dois testes usaram cargas diferentes, por isso os valores de corrente diferem. O `cliente_id` muda entre os testes porque é gerado a cada gravação do firmware.
+> Os dois testes usaram cargas diferentes, por isso os valores de corrente diferem. O `cliente_id` muda entre os testes porque o firmware gera um ID aleatório a cada conexão MQTT.
 
 ---
 
@@ -272,6 +275,7 @@ Esta é a primeira versão do sistema. Estes pontos serão tratados nas próxima
 * **Calibração:** os valores de corrente ainda não foram comparados com um instrumento de referência (multímetro ou alicate amperímetro).
 * **Faixa de medição:** o ZMCT103C é dimensionado para correntes de até 5 A. Os testes foram feitos com cargas de poucas dezenas de miliampères, onde a resolução é menor.
 * **Latência ponta a ponta:** ainda não foi medida. O campo `data_hora` registra o momento da gravação no banco e não permite calcular a latência isoladamente.
+* **Firmware:** o cálculo do RMS bloqueia o laço por 200 ms a cada ciclo e a reconexão MQTT é bloqueante. Se o DHT22 falhar, a leitura do ciclo inteiro (inclusive a corrente) não é publicada.
 * **Segurança da comunicação:** o tráfego MQTT ainda está em texto claro (porta 1883). TLS está previsto para a N2.
 * **Visualização:** a consulta aos dados é feita pelo MySQL Workbench. Não há dashboard ainda.
 
@@ -282,7 +286,7 @@ Esta é a primeira versão do sistema. Estes pontos serão tratados nas próxima
 * **Separação de responsabilidades:** o microcontrolador não executa SQL, o banco não conhece o sensor e o broker cuida apenas de mensageria e roteamento.
 * **Local-first e resiliência:** processamento e armazenamento ficam no perímetro local do CPD.
 * **Proteção de segredos:** variáveis de ambiente em `.env` e parâmetros locais em `config.h`, ambos fora do controle de versão pelo `.gitignore`. Os arquivos `.env.example` e `config.example.h` servem de modelo.
-* **Não bloqueio da CPU:** temporizadores por software (`millis()`) mantêm a recepção de pacotes de rede sempre ativa.
+* **Envio periódico sem `delay`:** um temporizador por software (`millis()`) controla o intervalo de 5 s no laço principal. O cálculo do RMS e a reconexão MQTT ainda são bloqueantes (ver [Limitações](#limitações-conhecidas)).
 
 ---
 
@@ -298,7 +302,7 @@ SentinelaCPD/
 ├── .gitignore              # Protege segredos e arquivos temporários
 │
 ├── images/                 # Banner, evidências e diagramas
-│   ├── banner_sentinela.png
+│   ├── banner_sentinelacpd.jpg
 │   ├── bancada_teste.jpg
 │   └── workbench_log.png
 │
@@ -318,7 +322,7 @@ SentinelaCPD/
 ### Pré-requisitos
 
 * Docker e Docker Compose;
-* Arduino IDE com suporte a placas ESP32 e a biblioteca PubSubClient;
+* Arduino IDE com suporte a placas ESP32 e as bibliotecas **PubSubClient** e **DHT sensor library** (Adafruit, que exige a *Adafruit Unified Sensor*); `WiFi` e `WiFiMulti` já vêm com o núcleo ESP32;
 * Placa ESP32, DHT22 e módulo ZMCT103C, ligados conforme a [tabela de pinagem](#hardware-e-pinagem).
 
 ### 1. Infraestrutura (Docker)
@@ -362,12 +366,13 @@ No painel do EMQX, crie uma **regra** que leia o tópico `esp32/telemetria`, ext
    cp config.example.h config.h
    ```
 
-3. Preencha as credenciais do Wi-Fi e o IP da máquina onde o Docker está rodando.
+3. Preencha as credenciais do Wi-Fi (até duas redes), o IP da máquina onde o Docker está rodando e o usuário e a senha MQTT.
+   Ajuste também `FATOR_CALIBRACAO_CORRENTE` (o exemplo usa `0.00055`) para a sua montagem, comparando a leitura com um multímetro ou alicate amperímetro.
 4. Abra `firmware.ino` no Arduino IDE, selecione a placa **ESP32 Dev Module** e faça o upload.
 
 ---
 
-## 🗺️ Roadmap (rumo à N2)
+## Roadmap (rumo à N2)
 
 ### Marco N1 (concluído)
 
@@ -386,6 +391,7 @@ No painel do EMQX, crie uma **regra** que leia o tópico `esp32/telemetria`, ext
 - [ ] Alertas por Webhook ou Telegram para violação de limites térmicos.
 - [ ] Comunicação criptografada com TLS (MQTTS, porta 8883).
 - [ ] Calibração da corrente com instrumento de referência e medição de latência.
+- [ ] Reconexão MQTT não bloqueante e `cliente_id` fixo por placa (baseado no MAC).
 
 ---
 
