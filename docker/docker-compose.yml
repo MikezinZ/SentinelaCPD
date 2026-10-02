@@ -3,9 +3,11 @@ services:
     image: mysql:8.0
     container_name: mysql_iot
     restart: always
+    command: --default-time-zone='-03:00'
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
+      TZ: America/Recife
     ports:
       - "3306:3306"
     volumes:

@@ -6,11 +6,11 @@ document.addEventListener('DOMContentLoaded', () => {
         new Chart(ctx.getContext('2d'), {
             type: 'line',
             data: {
-                labels: ['15:46:30', '15:46:35', '15:46:40', '15:46:45', '15:46:50', '15:46:55', '15:47:00'],
+                labels: ['00:05:00', '00:05:15', '00:05:25', '00:05:30 (Ligou)', '00:05:35', '00:05:50', '00:06:05', '00:06:15'],
                 datasets: [
                     {
                         label: 'Temperatura (°C)',
-                        data: [30.9, 30.9, 31.0, 31.0, 31.0, 31.0, 31.0],
+                        data: [24.3, 24.3, 24.3, 24.3, 24.3, 24.3, 24.2, 24.2],
                         borderColor: '#0284c7', // Azul Céu Técnico
                         backgroundColor: 'rgba(2, 132, 199, 0.08)',
                         borderWidth: 2,
@@ -19,8 +19,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         yAxisID: 'y'
                     },
                     {
-                        label: 'Corrente AC (A) - Carga 18W',
-                        data: [0.00, 0.00, 0.13, 0.12, 0.13, 0.13, 0.00],
+                        label: 'Corrente AC (A) - Carga Ativa',
+                        data: [0.01, 0.01, 0.01, 0.03, 0.08, 0.08, 0.08, 0.08],
                         borderColor: '#059669', // Verde Esmeralda
                         backgroundColor: 'rgba(5, 150, 105, 0.08)',
                         borderWidth: 2,
@@ -75,8 +75,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         type: 'linear',
                         display: true,
                         position: 'left',
-                        min: 25,
-                        max: 35,
+                        min: 20,
+                        max: 30,
                         grid: {
                             color: '#e2e8f0'
                         },
@@ -96,7 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         display: true,
                         position: 'right',
                         min: 0,
-                        max: 0.3,
+                        max: 0.15,
                         grid: {
                             drawOnChartArea: false
                         },

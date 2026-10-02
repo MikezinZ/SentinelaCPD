@@ -134,7 +134,7 @@
                             <li><i class="fa-solid fa-check"></i> Schema relacional <code>iot_db</code> configurado com
                                 volumes persistentes.</li>
                             <li><i class="fa-solid fa-check"></i> Tabela <code>leituras_dht22</code> contendo métricas
-                                de clima, corrente e timestamp.</li>
+                                de clima, corrente e timestamp sincronizado.</li>
                             <li><i class="fa-solid fa-check"></i> Auditoria e validação via MySQL Workbench através da
                                 porta local <code>3306</code>.</li>
                             <li><i class="fa-solid fa-check"></i> Preparado para indexação analítica e consultas
@@ -150,8 +150,24 @@
             <div class="container">
                 <div class="section-header">
                     <h2 class="section-title">Dispositivos de Borda e Circuito</h2>
-                    <p class="section-subtitle">Conexões físicas, barramentos de energia e isolamento elétrico no
-                        microcontrolador.</p>
+                    <p class="section-subtitle">Conexões físicas, barramentos de energia e ensaio experimental em
+                        bancada.</p>
+                </div>
+
+                <!-- Evidência da Bancada (Foto adicionada) -->
+                <div class="evidence-card">
+                    <div class="evidence-image-wrapper">
+                        <img src="images/bancada_teste.jpg" alt="Montagem física da bancada de testes SentinelaCPD"
+                            class="evidence-img">
+                    </div>
+                    <div class="evidence-caption">
+                        <h4>Bancada de Ensaios com Carga Ativa</h4>
+                        <p>
+                            Montagem experimental isolada: microcontrolador ESP32 DevKit v1, DHT22 (GPIO 27) para
+                            sensoriamento térmico e ZMCT103C (GPIO 34) monitorando indutivamente o condutor Fase da
+                            lâmpada de teste em rede de 220V AC sem contato galvânico direto com o circuito lógico.
+                        </p>
+                    </div>
                 </div>
 
                 <div class="table-wrapper">
@@ -223,24 +239,41 @@
                         dashboard N2.</p>
                 </div>
 
+                <!-- Evidência do Workbench (Foto adicionada) -->
+                <div class="evidence-card">
+                    <div class="evidence-image-wrapper">
+                        <img src="images/workbench_log.png" alt="Registros de telemetria no MySQL Workbench"
+                            class="evidence-img">
+                    </div>
+                    <div class="evidence-caption">
+                        <h4>Auditoria em Banco de Dados (MySQL Workbench)</h4>
+                        <p>
+                            Registros no banco <code>iot_db</code> comprovando a transição de repouso
+                            (<code>0.01 A</code>) para regime ativo estável (<code>0.08 A</code>), com monitoramento
+                            térmico constante a <code>24.3 °C</code> e <code>~57%</code> de umidade em intervalos de 5
+                            segundos.
+                        </p>
+                    </div>
+                </div>
+
                 <div class="cards-grid two-cols mb-lg">
                     <div class="card">
                         <div class="card-badge success">Homologado N1</div>
-                        <h3>Auditoria em Banco (Workbench)</h3>
-                        <p>Validação realizada com carga real em rede de 220V (Driver LED de 18W), registrando repouso
-                            em 0.00 A e corrente de regime ativo estável em ~0.13 A com latência inferior a 80 ms.</p>
+                        <h3>Métricas de Ensaio</h3>
+                        <p>Comportamento elétrico e ambiental validado sob carga real com taxa de amostragem
+                            determinística e sincronização temporal.</p>
                         <div class="stats-preview">
                             <div class="stat-item">
-                                <span class="stat-label">Carga em Repouso</span>
-                                <span class="stat-value">0.00 A</span>
+                                <span class="stat-label">Piso Repouso</span>
+                                <span class="stat-value">0.01 A</span>
                             </div>
                             <div class="stat-item">
-                                <span class="stat-label">Carga Ativa (18W)</span>
-                                <span class="stat-value">0.13 A</span>
+                                <span class="stat-label">Carga Ativa</span>
+                                <span class="stat-value">0.08 A</span>
                             </div>
                             <div class="stat-item">
-                                <span class="stat-label">Latência Total</span>
-                                <span class="stat-value">&lt; 80 ms</span>
+                                <span class="stat-label">Temperatura</span>
+                                <span class="stat-value">24.3 °C</span>
                             </div>
                         </div>
                     </div>
@@ -263,8 +296,8 @@
                 <!-- Demonstração Gráfica com Chart.js -->
                 <div class="chart-card">
                     <div class="chart-header">
-                        <h3>Demonstração Gráfica: Ensaios Experimentais em Bancada</h3>
-                        <span class="chart-badge">Série Temporal N1</span>
+                        <h3>Série Temporal: Ensaio de Bancada com Transição de Carga</h3>
+                        <span class="chart-badge">Dados Reais Registrados</span>
                     </div>
                     <div class="chart-container">
                         <canvas id="telemetriaChart"></canvas>

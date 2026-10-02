@@ -209,6 +209,41 @@ ORDER BY id DESC LIMIT 5;
 * **Regime Nominal Ativo:** A leitura estabilizou com precisão em `~0.13 A`, condizente com a potência ativa do conjunto e seu fator de potência.
 * **Latência de Trânsito:** Latência ponta a ponta (leitura -> Wi-Fi -> EMQX -> MySQL) inferior a $80\text{ ms}$.
 
+### Evidências da Bancada e Transição de Estado
+
+A foto abaixo mostra a montagem física com a carga ativa (lâmpada ligada) e o registro correspondente no MySQL Workbench:
+
+![Bancada de testes do SentinelaCPD com carga ativa](images/bancada_teste.jpg)
+
+![Registros de telemetria no MySQL Workbench](images/workbench_log.png)
+
+```text
++-----+----------------+-------------------+-------------+---------+----------+---------------------+
+| id  | cliente_id     | topico            | temperatura | umidade | corrente | data_hora           |
++-----+----------------+-------------------+-------------+---------+----------+---------------------+
+| 698 | ESP32_CPD_69b3 | esp32/telemetria  | 24.2        | 56.6    | 0.08     | 2026-10-02 00:06:15 |
+| 697 | ESP32_CPD_69b3 | esp32/telemetria  | 24.2        | 56.7    | 0.08     | 2026-10-02 00:06:10 |
+| 696 | ESP32_CPD_69b3 | esp32/telemetria  | 24.2        | 56.9    | 0.08     | 2026-10-02 00:06:05 |
+| 695 | ESP32_CPD_69b3 | esp32/telemetria  | 24.2        | 57.5    | 0.08     | 2026-10-02 00:06:00 |
+| 694 | ESP32_CPD_69b3 | esp32/telemetria  | 24.3        | 56.8    | 0.08     | 2026-10-02 00:05:55 |
+| 693 | ESP32_CPD_69b3 | esp32/telemetria  | 24.3        | 56.7    | 0.08     | 2026-10-02 00:05:50 |
+| 692 | ESP32_CPD_69b3 | esp32/telemetria  | 24.3        | 57.3    | 0.08     | 2026-10-02 00:05:45 |
+| 691 | ESP32_CPD_69b3 | esp32/telemetria  | 24.3        | 57.4    | 0.08     | 2026-10-02 00:05:40 |
+| 690 | ESP32_CPD_69b3 | esp32/telemetria  | 24.3        | 57.6    | 0.08     | 2026-10-02 00:05:35 |
+| 689 | ESP32_CPD_69b3 | esp32/telemetria  | 24.3        | 57.3    | 0.03     | 2026-10-02 00:05:30 |
+| 688 | ESP32_CPD_69b3 | esp32/telemetria  | 24.3        | 57.1    | 0.01     | 2026-10-02 00:05:25 |
+| 687 | ESP32_CPD_69b3 | esp32/telemetria  | 24.3        | 56.9    | 0.01     | 2026-10-02 00:05:20 |
+| 686 | ESP32_CPD_69b3 | esp32/telemetria  | 24.3        | 57.1    | 0.01     | 2026-10-02 00:05:15 |
+| 685 | ESP32_CPD_69b3 | esp32/telemetria  | 24.3        | 57.0    | 0.01     | 2026-10-02 00:05:10 |
+| 684 | ESP32_CPD_69b3 | esp32/telemetria  | 24.3        | 57.3    | 0.01     | 2026-10-02 00:05:05 |
+| 683 | ESP32_CPD_69b3 | esp32/telemetria  | 24.3        | 57.4    | 0.01     | 2026-10-02 00:05:00 |
++-----+----------------+-------------------+-------------+---------+----------+---------------------+
+```
+
+* **Repouso:** Com a carga desligada, a corrente permaneceu no piso residual de `0.01 A` (registros 683 a 688).
+* **Transição de Estado:** Ao acionar a carga, a corrente subiu para `0.03 A` (registro 689, amostra de transição) e estabilizou em `0.08 A` a partir do registro 690.
+* **Consistência Climática:** Temperatura (`~24.3 °C`) e umidade (`~57%`) registradas sem interrupções, em intervalos regulares de 5 segundos.
+
 ---
 
 # Princípios de Engenharia Adotados
@@ -232,14 +267,13 @@ SentinelaCPD/
 ├── .gitignore              # Proteção contra tracking de segredos e temporários
 │
 ├── images/                 # Evidências experimentais, diagramas e esquemáticos
-│   ├── hero_sentinela.png
+│   ├── banner_sentinela.png
 │   ├── bancada_teste.jpg
 │   └── workbench_log.png
 │
 ├── firmware/               # Código C++ do ESP32
 │   ├── firmware.ino        # Lógica principal, amostragem e loop MQTT
 │   └── config.example.h    # Modelo parametrizado de configurações e pinagem
-│     
 │
 └── docker/                 # Orquestração do Backend
     ├── docker-compose.yml  # Descritor dos serviços EMQX e MySQL 8.0
