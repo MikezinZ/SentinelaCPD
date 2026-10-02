@@ -37,13 +37,14 @@ A N1 é **uma parte do projeto**. Itens como alimentação por bateria, dashboar
 4. [Visão do sistema e arquitetura](#visão-do-sistema-e-arquitetura)
 5. [Fundamentação matemática: RMS](#fundamentação-matemática-cálculo-discreto-de-rms)
 6. [Hardware e pinagem](#hardware-e-pinagem)
-7. [Resultados experimentais (N1)](#resultados-experimentais-n1)
-8. [Limitações conhecidas](#limitações-conhecidas)
-9. [Princípios de engenharia](#princípios-de-engenharia-adotados)
-10. [Organização do repositório](#organização-do-repositório)
-11. [Como reproduzir](#como-reproduzir-o-projeto)
-12. [Roadmap](#roadmap-rumo-à-n2)
-13. [Licença](#licença-e-agradecimentos)
+7. [Esquemático e circuito eletrônico](#esquemático-e-circuito-eletrônico)
+8. [Resultados experimentais (N1)](#resultados-experimentais-n1)
+9. [Limitações conhecidas](#limitações-conhecidas)
+10. [Princípios de engenharia](#princípios-de-engenharia-adotados)
+11. [Organização do repositório](#organização-do-repositório)
+12. [Como reproduzir](#como-reproduzir-o-projeto)
+13. [Roadmap](#roadmap-rumo-à-n2)
+14. [Licença](#licença-e-agradecimentos)
 
 ---
 
@@ -103,31 +104,67 @@ O SentinelaCPD é um **pipeline de dados contínuo**, projetado para:
 * Reconectar sozinho ao Wi-Fi e ao broker;
 * Persistir as leituras em banco relacional para auditoria.
 
-<!-- TODO: substituir pelo diagrama completo em imagem: images/diagrama_sistema.png -->
+### Diagrama completo do sistema
 
-```text
-                     Ambiente Físico do CPD
-                (Temperatura, Umidade, Carga AC)
-                                │
-                                ▼
-                   Camada de Percepção Física
-                     (DHT22 + ZMCT103C)
-                                │
-                                ▼
-                     Processamento de Borda
-                  (ESP32-WROOM-32)
-                                │  Wi-Fi · MQTT (TCP 1883)
-                                ▼  tópico: esp32/telemetria
-                   Broker MQTT em Rede Local
-                       (EMQX 5.x · Docker)
-                                │  Regra SQL (parse do JSON)
-                                ▼
-                      Persistência de Dados
-                        (MySQL Server 8.0)
-                                │
-                                ▼
-                   Consulta e Auditoria
-                     (MySQL Workbench)
+Todo o fluxo opera na rede local do CPD, sem dependência de serviços em nuvem. Percepção, roteamento de mensagens e armazenamento ficam desacoplados.
+
+```mermaid
+flowchart TD
+    subgraph PERCEPCAO["1. Percepção física"]
+        CARGA["Circuito AC monitorado (220V / 60Hz)"]
+        CLIMA["Ar ambiente do CPD"]
+        ZMC["Sensor de corrente ZMCT103C"]
+        DHT["Sensor de clima DHT22"]
+
+        CARGA -->|"Acoplamento indutivo não invasivo"| ZMC
+        CLIMA --> DHT
+    end
+
+    subgraph BORDA["2. Borda: ESP32-WROOM-32"]
+        RMS["Cálculo discreto de RMS (janela de 200 ms)"]
+        TIMER["Temporizador millis (ciclo de 5 s)"]
+        PAYLOAD["Serialização do payload JSON"]
+
+        RMS --> PAYLOAD
+        TIMER --> PAYLOAD
+    end
+
+    subgraph REDE["3. Transporte"]
+        WIFI["Rede Wi-Fi local (multi-SSID)"]
+        MQTTPUB["Publicação MQTT (tópico esp32/telemetria)"]
+
+        WIFI --> MQTTPUB
+    end
+
+    subgraph DOCKER["4. Backend local (Docker Compose)"]
+        EMQX["Broker EMQX 5.x (porta 1883)"]
+        RULE["Regra SQL (extração dos campos do JSON)"]
+        BRIDGE["Data Bridge para MySQL"]
+        MYSQL[("MySQL 8.0 (porta 3306)")]
+        TABLE["Tabela iot_db.leituras_dht22"]
+
+        EMQX --> RULE --> BRIDGE --> MYSQL --> TABLE
+    end
+
+    subgraph AUDITORIA["5. Auditoria e apresentação"]
+        WB["MySQL Workbench (validação N1)"]
+        DASH["Dashboard web e alertas ASHRAE (N2)"]
+    end
+
+    ZMC -->|"GPIO 34 (ADC1)"| RMS
+    DHT -->|"GPIO 27"| TIMER
+    PAYLOAD --> WIFI
+    MQTTPUB -->|"TCP 1883 com autenticação"| EMQX
+    TABLE -.->|"Consultas SQL"| WB
+    TABLE -.->|"WebSockets (roadmap)"| DASH
+```
+
+<!-- TODO: exportar o diagrama também como imagem: images/diagrama_sistema.png -->
+
+O ESP32 publica a cada 5 segundos um payload JSON como este:
+
+```json
+{"temperatura": 24.3, "umidade": 57.1, "corrente": 0.08}
 ```
 
 ### Camadas e responsabilidades
@@ -161,6 +198,17 @@ O SentinelaCPD é um **pipeline de dados contínuo**, projetado para:
 |   - Consulta e validação via MySQL Workbench                      |
 +-------------------------------------------------------------------+
 ```
+
+### Responsabilidades por camada
+
+| Camada | Componentes | Protocolo / barramento | Responsabilidade |
+| --- | --- | --- | --- |
+| **1. Percepção** | DHT22, ZMCT103C | Indução magnética / digital de 1 fio | Sensoriamento não invasivo de corrente e do microclima. |
+| **2. Borda** | ESP32-WROOM-32 | GPIO 27, GPIO 34 (ADC1) | Aquisição, cálculo do $I_{\text{RMS}}$ e montagem do payload JSON. |
+| **3. Transporte** | Wi-Fi 802.11 b/g/n | MQTT 3.1.1 sobre TCP (1883) | Publicação periódica com reconexão automática. |
+| **4a. Mensageria** | EMQX 5.x (Docker) | MQTT e regra SQL | Autenticação de dispositivo, roteamento e ingestão no banco via Data Bridge. |
+| **4b. Persistência** | MySQL 8.0 (Docker) | TCP 3306 / SQL | Armazenamento relacional da série temporal. |
+| **5. Auditoria** | MySQL Workbench (N1), dashboard web (N2) | SQL / WebSockets | Validação dos dados na N1; visualização e alertas na N2. |
 
 ---
 
@@ -199,7 +247,111 @@ Com $K = 0{,}00055$ (valor de exemplo em `config.example.h`), esse limiar equiva
 
 > ⚠️ **Segurança:** o teste envolve tensão de rede (220 V AC). Mantenha emendas e conexões do cabo de carga isoladas e afastadas da protoboard e do notebook. Nunca manipule o circuito energizado.
 
-<!-- TODO: adicionar esquemático em imagem: images/esquematico_circuito.png -->
+---
+
+## Esquemático e circuito eletrônico
+
+O sistema separa a eletrônica de borda (DC, baixa tensão) da linha de potência monitorada (220 V AC / 60 Hz). O isolamento galvânico é dado pelo próprio transformador de corrente do ZMCT103C: o condutor fase atravessa o toroide e o sinal chega ao ESP32 apenas por acoplamento magnético. As ligações entre o microcontrolador e os sensores usam os barramentos de alimentação e as linhas 17 e 27 da protoboard.
+
+> Na N1, a carga monitorada foi uma lâmpada/painel LED (ver [Resultados experimentais](#resultados-experimentais-n1)). Na aplicação-alvo, o mesmo condutor seria o circuito de alimentação de um rack ou PDU.
+
+### Mapeamento físico da protoboard
+
+```text
+===================== BARRAMENTO SUPERIOR (+) =====================
+ [Barramento (+)] ────┬──────────────────┬──────────────────┐
+                      │                  │                  │
+                      ▼                  ▼                  ▼
+                 [ESP32 VIN]        [DHT22 VCC]      [ZMCT103C VCC]
+
+===================== BARRAMENTO INFERIOR (-) =====================
+ [Barramento (-)] ────┬──────────────────┬──────────────────┐
+                      │                  │                  │
+                      ▼                  ▼                  ▼
+                 [ESP32 GND]        [DHT22 GND]      [ZMCT103C GND]
+
+========================== NÓS DE SINAL ===========================
+
+ Linha 17 (barramento de dados do DHT22):
+ [ESP32 GPIO 27] ──► Furo 17f ═══ (trilha interna 17) ═══ Furo 17j ◄── [DHT22 DAT]
+
+ Linha 27 (canal analógico ADC1 do ZMCT103C):
+ [ESP32 GPIO 34] ──► Furo 27f ═══ (trilha interna 27) ═══ Furo 27j ◄── [ZMCT103C OUT]
+
+========================= ISOLAMENTO GALVÂNICO ====================
+
+ Condutor fase (220 V) ──► ( Furo toroidal do ZMCT103C ) ──► Carga monitorada
+                               [Acoplamento indutivo]
+```
+
+### Esquemático estrutural do sistema
+
+```mermaid
+flowchart TD
+    subgraph POTENCIA["Circuito de potência monitorado (220V AC)"]
+        Fase["Condutor fase"]
+        Neutro["Neutro / retorno"]
+        Equip["Carga monitorada (N1: lâmpada LED / alvo: rack ou PDU)"]
+
+        Fase -->|"Atravessa o núcleo toroidal"| Toroide["Transformador ZMCT103C (1000:1)"]
+        Toroide --> Equip
+        Neutro --> Equip
+    end
+
+    subgraph BORDA["Eletrônica de borda na protoboard (DC)"]
+        subgraph RAILS["Barramentos de alimentação"]
+            RailPos["Barramento (+)"]
+            RailNeg["Barramento (-) GND"]
+        end
+
+        subgraph NODES["Nós de conexão"]
+            Node17["Linha 17 (furos 17f e 17j)"]
+            Node27["Linha 27 (furos 27f e 27j)"]
+        end
+
+        ESP["ESP32 DevKit"]
+        DHT["Sensor DHT22"]
+        ZMC["Módulo condicionador ZMCT103C"]
+
+        ESP -->|"VIN"| RailPos
+        ESP -->|"GND"| RailNeg
+
+        RailPos -->|"VCC"| DHT
+        RailNeg -->|"GND"| DHT
+
+        RailPos -->|"VCC"| ZMC
+        RailNeg -->|"GND"| ZMC
+
+        ESP -->|"GPIO 27"| Node17
+        DHT -->|"DAT"| Node17
+
+        ESP -->|"GPIO 34"| Node27
+        ZMC -->|"OUT"| Node27
+    end
+
+    Toroide -.->|"Acoplamento magnético, sem contato elétrico"| ZMC
+```
+
+<!-- TODO: exportar o esquemático também como imagem: images/esquematico_circuito.png -->
+
+### Matriz de conexões e roteamento físico
+
+| Dispositivo | Terminal | Ponto na protoboard | Destino | Domínio / interface | Função técnica |
+| --- | --- | --- | --- | --- | --- |
+| **ESP32** | `VIN` | Barramento (`+`) | Trilhas de alimentação | 5 V DC (da USB) | Fornece a tensão de 5 V ao barramento (+), alimentado via USB na N1. |
+| **ESP32** | `GND` | Barramento (`-`) | Barramento de retorno | 0 V DC | Terra comum e referência de sinal. |
+| **ESP32** | `GPIO 27` | Furo `17f` | Linha 17 (furo `17j`) | Digital, 1 fio | Linha de dados do sensor térmico. |
+| **DHT22** | `DAT` | Furo `17j` | Linha 17 (furo `17f`) | Digital, 1 fio | Envio dos dados de temperatura e umidade. |
+| **DHT22** | `VCC` | Barramento (`+`) | Trilhas de alimentação | Tensão do barramento (+) | Alimentação do sensor climático. |
+| **DHT22** | `GND` | Barramento (`-`) | Barramento de retorno | 0 V DC | Terra do sensor. |
+| **ESP32** | `GPIO 34` | Furo `27f` | Linha 27 (furo `27j`) | Analógico (ADC1) | Aquisição contínua para o cálculo do $I_{\text{RMS}}$. |
+| **ZMCT103C** | `OUT` | Furo `27j` | Linha 27 (furo `27f`) | Analógico (sinal AC com offset) | Tensão senoidal proporcional à corrente, centrada no ponto médio de polarização. |
+| **ZMCT103C** | `VCC` | Barramento (`+`) | Trilhas de alimentação | Tensão do barramento (+) | Alimentação do condicionador de sinal do módulo. |
+| **ZMCT103C** | `GND` | Barramento (`-`) | Barramento de retorno | 0 V DC | Referência do circuito de condicionamento. |
+| **Linha AC** | Condutor fase | Furo toroidal | Carga monitorada | 220 V AC / 60 Hz | Leitura por indução eletromagnética, sem contato elétrico. |
+
+> **Observação:** a tensão do barramento (+) deve respeitar os limites de nível lógico descritos em [Hardware e pinagem](#hardware-e-pinagem): DHT22 preferencialmente em 3,3 V e saída do ZMCT103C sempre abaixo de 3,3 V no pino do ESP32.
+> As linhas 17 e 27 ligam o pino do ESP32 ao sensor na mesma tira de contatos (furos `f` a `j`), sem jumpers adicionais.
 
 ---
 
@@ -323,7 +475,7 @@ SentinelaCPD/
 
 * Docker e Docker Compose;
 * Arduino IDE com suporte a placas ESP32 e as bibliotecas **PubSubClient** e **DHT sensor library** (Adafruit, que exige a *Adafruit Unified Sensor*); `WiFi` e `WiFiMulti` já vêm com o núcleo ESP32;
-* Placa ESP32, DHT22 e módulo ZMCT103C, ligados conforme a [tabela de pinagem](#hardware-e-pinagem).
+* Placa ESP32, DHT22 e módulo ZMCT103C, ligados conforme a [tabela de pinagem](#hardware-e-pinagem) e o [esquemático](#esquemático-e-circuito-eletrônico).
 
 ### 1. Infraestrutura (Docker)
 
@@ -380,8 +532,10 @@ No painel do EMQX, crie uma **regra** que leia o tópico `esp32/telemetria`, ext
 - [x] Broker EMQX com autenticação e persistência em MySQL, via Docker.
 - [x] Validação em bancada com carga real.
 - [x] GitPage e documentação técnica.
-- [ ] Diagrama completo do sistema em imagem.
-- [ ] Esquemático do circuito em imagem.
+- [x] Esquemático do circuito (mapa da protoboard e diagrama Mermaid no README).
+- [x] Diagrama completo do sistema (Mermaid no README).
+- [ ] Diagrama completo do sistema exportado em imagem.
+- [ ] Esquemático do circuito exportado em imagem.
 
 ### Marco N2 (em desenvolvimento)
 
