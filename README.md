@@ -25,7 +25,7 @@ O SentinelaCPD concluiu sua **primeira etapa de validação física e arquitetur
 
 Nesta etapa, a plataforma coleta temperatura e umidade e calcula a corrente alternada eficaz ($I_{\text{RMS}}$) em um circuito de 220 V AC. Os dados seguem de um nó ESP32 até um broker MQTT (EMQX) em Docker e são gravados em um banco MySQL, onde podem ser consultados para auditoria.
 
-A N1 é **uma parte do projeto**. Itens como alimentação por bateria, dashboard e alertas estão no [roadmap](#roadmap-rumo-à-n2).
+A N1 é uma **validação de bancada** do conceito e **uma parte do projeto**. A instalação em um CPD real, a calibração com instrumento de referência, o dashboard, os alertas e a alimentação por bateria estão previstos para etapas posteriores (ver [limitações](#limitações-conhecidas) e [roadmap](#roadmap-rumo-à-n2)).
 
 ---
 
@@ -33,18 +33,19 @@ A N1 é **uma parte do projeto**. Itens como alimentação por bateria, dashboar
 
 1. [Por que o SentinelaCPD?](#por-que-o-sentinelacpd)
 2. [Motivação de engenharia](#motivação-de-engenharia)
-3. [Stack tecnológica](#stack-tecnológica)
-4. [Visão do sistema e arquitetura](#visão-do-sistema-e-arquitetura)
-5. [Fundamentação matemática: RMS](#fundamentação-matemática-cálculo-discreto-de-rms)
-6. [Hardware e pinagem](#hardware-e-pinagem)
-7. [Esquemático e circuito eletrônico](#esquemático-e-circuito-eletrônico)
-8. [Resultados experimentais (N1)](#resultados-experimentais-n1)
-9. [Limitações conhecidas](#limitações-conhecidas)
-10. [Princípios de engenharia](#princípios-de-engenharia-adotados)
-11. [Organização do repositório](#organização-do-repositório)
-12. [Como reproduzir](#como-reproduzir-o-projeto)
-13. [Roadmap](#roadmap-rumo-à-n2)
-14. [Licença](#licença-e-agradecimentos)
+3. [Objetivos e critérios de validação da N1](#objetivos-e-critérios-de-validação-da-n1)
+4. [Stack tecnológica](#stack-tecnológica)
+5. [Visão do sistema e arquitetura](#visão-do-sistema-e-arquitetura)
+6. [Fundamentação matemática: RMS](#fundamentação-matemática-cálculo-discreto-de-rms)
+7. [Hardware e pinagem](#hardware-e-pinagem)
+8. [Esquemático e circuito eletrônico](#esquemático-e-circuito-eletrônico)
+9. [Resultados experimentais (N1)](#resultados-experimentais-n1)
+10. [Limitações conhecidas](#limitações-conhecidas)
+11. [Princípios de engenharia](#princípios-de-engenharia-adotados)
+12. [Organização do repositório](#organização-do-repositório)
+13. [Como reproduzir](#como-reproduzir-o-projeto)
+14. [Roadmap](#roadmap-rumo-à-n2)
+15. [Licença](#licença-e-agradecimentos)
 
 ---
 
@@ -73,6 +74,38 @@ Três pilares sustentam o trabalho:
 1. **Prevenção de hotspots térmicos:** mapear o microclima próximo aos racks antes que o calor residual atinja níveis destrutivos.
 2. **Auditoria de carga e continuidade elétrica:** detectar a presença ou o corte de alimentação em circuitos-chave com sensoriamento indutivo não invasivo.
 3. **Soberania e desacoplamento:** manter o pipeline de telemetria funcionando em rede local restrita, sem depender de nuvens públicas.
+
+---
+
+## Objetivos e critérios de validação da N1
+
+A primeira versão do SentinelaCPD tem como objetivos:
+
+1. Adquirir temperatura e umidade do ambiente.
+2. Adquirir a corrente alternada por sensoriamento indutivo.
+3. Calcular a corrente RMS no dispositivo de borda.
+4. Transmitir as leituras por MQTT.
+5. Receber e processar as mensagens no EMQX.
+6. Persistir as informações em um banco MySQL.
+7. Permitir a consulta e a auditoria das leituras armazenadas.
+8. Validar fisicamente o funcionamento do pipeline completo.
+9. Documentar a arquitetura, o circuito, o firmware e o processo de reprodução.
+
+| Requisito | Implementação | Situação |
+| --- | --- | :---: |
+| Aquisição de temperatura e umidade | DHT22 | ✅ |
+| Medição de corrente AC | ZMCT103C | ✅ |
+| Cálculo de corrente RMS | ESP32 | ✅ |
+| Comunicação sem fio | Wi-Fi | ✅ |
+| Mensageria | MQTT 3.1.1 | ✅ |
+| Broker e autenticação MQTT | EMQX 5.x | ✅ |
+| Infraestrutura | Docker / Docker Compose | ✅ |
+| Ingestão no banco | Data Bridge / regra SQL | ✅ |
+| Persistência | MySQL 8.0 | ✅ |
+| Validação dos dados | MySQL Workbench | ✅ |
+| Teste físico | Cargas LED em 220 V AC | ✅ |
+| Dashboard em tempo real | — | 🔄 N2 |
+| Alertas e TLS/MQTTS | — | 🔄 N2 |
 
 ---
 
@@ -387,7 +420,11 @@ ORDER BY id;
 
 ![Bancada de testes do SentinelaCPD com carga ativa](images/bancada_teste.jpg)
 
+*Montagem de bancada: o condutor fase atravessa o toroide do ZMCT103C, sem contato elétrico com o circuito lógico.*
+
 ![Registros de telemetria no MySQL Workbench](images/workbench_log.png)
+
+*Registros no banco `iot_db` mostrando a transição de estado da corrente, gravados pelo Data Bridge.*
 
 ```text
 +-----+----------------+-------------------+-------------+---------+----------+---------------------+
@@ -477,6 +514,13 @@ SentinelaCPD/
 * Arduino IDE com suporte a placas ESP32 e as bibliotecas **PubSubClient** e **DHT sensor library** (Adafruit, que exige a *Adafruit Unified Sensor*); `WiFi` e `WiFiMulti` já vêm com o núcleo ESP32;
 * Placa ESP32, DHT22 e módulo ZMCT103C, ligados conforme a [tabela de pinagem](#hardware-e-pinagem) e o [esquemático](#esquemático-e-circuito-eletrônico).
 
+Clone o repositório:
+
+```bash
+git clone https://github.com/MikezinZ/SentinelaCPD.git
+cd SentinelaCPD
+```
+
 ### 1. Infraestrutura (Docker)
 
 ```bash
@@ -554,3 +598,7 @@ No painel do EMQX, crie uma **regra** que leia o tópico `esp32/telemetria`, ext
 Este projeto é distribuído sob a licença **MIT**. Consulte o arquivo `LICENSE`.
 
 Agradecimentos ao corpo docente de Engenharia da Computação e às comunidades de software livre do **EMQX**, do **Eclipse Paho / PubSubClient** e do ecossistema **Arduino / ESP32**.
+
+---
+
+> **Desenvolvido por Miguel Melo, Diego Ximenes e Diogo Novaes** — Projeto Integrador 6 / Engenharia da Computação (2026.2).
