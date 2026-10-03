@@ -29,7 +29,7 @@
             <nav class="nav-menu">
                 <a href="#home" class="nav-link active">Home</a>
                 <a href="#plataforma" class="nav-link">Plataforma</a>
-                <a href="#dispositivo" class="nav-link">Dispositivo</a>
+                <a href="#dispositivo" class="nav-link">Dispositivos</a>
                 <a href="#aplicativo" class="nav-link">Aplicativo</a>
             </nav>
         </div>
@@ -40,7 +40,7 @@
         <section id="home" class="section">
             <div class="container">
                 <div class="badge-status">
-                    <span class="badge-dot"></span> Projeto Integrador 6 • Entrega N1 Homologada
+                    <span class="badge-dot"></span> Projeto Integrador 6 • N1 — Validação de Bancada
                 </div>
 
                 <h1 class="main-title">Telemetria Climática e Continuidade Energética para CPDs</h1>
@@ -60,7 +60,8 @@
                     <div class="card">
                         <div class="card-icon"><i class="fa-solid fa-bolt-lightning"></i></div>
                         <h3>Cálculo RMS Discreto</h3>
-                        <p>Medição de corrente alternada com sensor toroidal ZMCT103C, amostrando a 60 Hz em janelas de
+                        <p>Medição de corrente alternada com sensor toroidal ZMCT103C, monitorando a rede de 60 Hz em
+                            janelas de
                             200 ms para obter o valor eficaz real (RMS).</p>
                     </div>
                     <div class="card">
@@ -80,6 +81,16 @@
                     <h2 class="section-title">Plataforma IoT e Arquitetura de Dados</h2>
                     <p class="section-subtitle">Integração entre o nó embarcado e a persistência relacional através de
                         mensageria assíncrona.</p>
+                </div>
+
+                <div class="evidence-card">
+                    <div class="evidence-image-wrapper">
+                        <img src="images/diagrama_sistema.png" alt="Diagrama completo do sistema" class="evidence-img">
+                    </div>
+                    <div class="evidence-caption">
+                        <h4>Diagrama completo do sistema</h4>
+                        <p>Sensores, processamento no ESP32, MQTT, integração EMQX/MySQL e auditoria na N1.</p>
+                    </div>
                 </div>
 
                 <div class="pipeline-card">
@@ -155,6 +166,18 @@
                 </div>
 
                 <!-- Evidência da Bancada (Foto adicionada) -->
+                <div class="evidence-card">
+                    <div class="evidence-image-wrapper">
+                        <img src="images/esquematico_circuito.png" alt="Circuito eletrônico e elétrico"
+                            class="evidence-img">
+                    </div>
+                    <div class="evidence-caption">
+                        <h4>Circuito eletrônico e elétrico</h4>
+                        <p>Interligação dos módulos e circuito AC monitorado. Os níveis lógicos devem respeitar os
+                            limites do ESP32; consulte a pinagem.</p>
+                    </div>
+                </div>
+
                 <div class="evidence-card">
                     <div class="evidence-image-wrapper">
                         <img src="images/bancada_teste.jpg" alt="Montagem física da bancada de testes SentinelaCPD"
@@ -235,7 +258,7 @@
             <div class="container">
                 <div class="section-header">
                     <h2 class="section-title">Aplicativo e Camada de Apresentação</h2>
-                    <p class="section-subtitle">Resultados práticos homologados na bancada N1 e projeções para o
+                    <p class="section-subtitle">Resultados práticos registrados na bancada N1 e projeções para o
                         dashboard N2.</p>
                 </div>
 
@@ -258,7 +281,7 @@
 
                 <div class="cards-grid two-cols mb-lg">
                     <div class="card">
-                        <div class="card-badge success">Homologado N1</div>
+                        <div class="card-badge success">Validação de Bancada N1</div>
                         <h3>Métricas de Ensaio</h3>
                         <p>Comportamento elétrico e ambiental validado sob carga real com taxa de amostragem
                             determinística e sincronização temporal.</p>

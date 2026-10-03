@@ -192,7 +192,7 @@ flowchart TD
     TABLE -.->|"WebSockets (roadmap)"| DASH
 ```
 
-<!-- TODO: exportar o diagrama também como imagem: images/diagrama_sistema.png -->
+![Diagrama completo do sistema](images/diagrama_sistema.png)
 
 O ESP32 publica a cada 5 segundos um payload JSON como este:
 
@@ -365,7 +365,9 @@ flowchart TD
     Toroide -.->|"Acoplamento magnético, sem contato elétrico"| ZMC
 ```
 
-<!-- TODO: exportar o esquemático também como imagem: images/esquematico_circuito.png -->
+![Esquemático de interligação dos módulos e circuito AC](images/esquematico_circuito.png)
+
+A imagem representa as conexões documentadas entre os módulos; não especifica o circuito interno do condicionador. Confira alimentação e níveis de sinal conforme a seção de pinagem.
 
 ### Matriz de conexões e roteamento físico
 
@@ -493,7 +495,9 @@ SentinelaCPD/
 ├── images/                 # Banner, evidências e diagramas
 │   ├── banner_sentinelacpd.jpg
 │   ├── bancada_teste.jpg
-│   └── workbench_log.png
+│   ├── workbench_log.png
+│   ├── diagrama_sistema.png
+│   └── esquematico_circuito.png
 │
 ├── firmware/               # Código C++ do ESP32
 │   ├── firmware.ino        # Amostragem, RMS e loop MQTT
@@ -501,7 +505,10 @@ SentinelaCPD/
 │
 └── docker/                 # Backend
     ├── docker-compose.yml  # Serviços EMQX e MySQL 8.0
-    └── .env.example        # Modelo de variáveis de ambiente
+    ├── .env.example        # Modelo de variáveis de ambiente
+    ├── EMQX_SETUP.md        # Configuração manual e verificação
+    └── mysql/
+        └── init.sql       # Schema de telemetria (volume novo)
 ```
 
 ---
@@ -549,9 +556,11 @@ A tabela `iot_db.leituras_dht22` armazena as leituras com as colunas:
 | `corrente` | Corrente RMS em A |
 | `data_hora` | Data e hora da gravação |
 
-Em `iot_db` também ficam as tabelas `mqtt_user` e `mqtt_acl`, usadas na autenticação e na autorização de dispositivos do broker.
+A configuração descrita para a bancada utiliza também `mqtt_user` e `mqtt_acl` para autenticação e autorização. Essas tabelas e configurações não são provisionadas pelo `init.sql` deste repositório. O guia abaixo explica a preservação da bancada e uma alternativa manual para instalações novas.
 
-No painel do EMQX, crie uma **regra** que leia o tópico `esp32/telemetria`, extraia os campos do JSON e grave na tabela por meio de um conector MySQL.
+Em um volume novo, `docker/mysql/init.sql` cria automaticamente a tabela de telemetria no banco definido por `MYSQL_DATABASE` (use `iot_db`). Usuários MySQL definidos no Compose também são criados apenas na primeira inicialização.
+
+Siga [Configuração EMQX → MySQL](docker/EMQX_SETUP.md) para criar o Connector, a regra SQL, o Sink e configurar a autenticação MQTT. A configuração do EMQX é manual; o Compose, sozinho, não provisiona esse pipeline. O guia inclui cuidados para volumes já existentes e verificação dos registros.
 
 ### 3. Firmware
 
@@ -570,7 +579,7 @@ No painel do EMQX, crie uma **regra** que leia o tópico `esp32/telemetria`, ext
 
 ## Roadmap (rumo à N2)
 
-### Marco N1 (concluído)
+### Marco N1 (versão 1 — validação de bancada)
 
 - [x] Firmware com amostragem de temperatura, umidade e corrente RMS.
 - [x] Broker EMQX com autenticação e persistência em MySQL, via Docker.
@@ -578,8 +587,8 @@ No painel do EMQX, crie uma **regra** que leia o tópico `esp32/telemetria`, ext
 - [x] GitPage e documentação técnica.
 - [x] Esquemático do circuito (mapa da protoboard e diagrama Mermaid no README).
 - [x] Diagrama completo do sistema (Mermaid no README).
-- [ ] Diagrama completo do sistema exportado em imagem.
-- [ ] Esquemático do circuito exportado em imagem.
+- [x] Diagrama completo do sistema exportado em imagem.
+- [x] Esquemático de interligação do circuito exportado em imagem.
 
 ### Marco N2 (em desenvolvimento)
 
@@ -602,3 +611,4 @@ Agradecimentos ao corpo docente de Engenharia da Computação e às comunidades 
 ---
 
 > **Desenvolvido por Miguel Melo, Diego Ximenes e Diogo Novaes** — Projeto Integrador 6 / Engenharia da Computação (2026.2).
+
