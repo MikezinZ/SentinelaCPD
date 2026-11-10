@@ -1,0 +1,89 @@
+services:
+  emqx:
+    image: emqx/emqx:5.8.0
+    container_name: sentinela-emqx
+    restart: unless-stopped
+    ports:
+      - "1883:1883"     # MQTT (ESP32)
+      - "8083:8083"     # MQTT sobre WebSocket (cliente do dashboard)
+      - "18083:18083"   # Dashboard do EMQX
+    volumes:
+      - emqx_data:/opt/emqx/data
+
+  mysql:
+    image: mysql:8.0
+    container_name: sentinela-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      TZ: America/Recife
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  ingestor:
+    build: ./ingestor
+    container_name: sentinela-ingestor
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      emqx:
+        condition: service_started
+    environment:
+      MQTT_HOST: emqx
+      MQTT_PORT: 1883
+      DB_HOST: mysql
+      DB_NAME: ${MYSQL_DATABASE}
+      DB_USER: ${MYSQL_USER}
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+      DEVICE_PADRAO: ESP32_CPD_01
+
+  notifier:
+    build: ./notifier
+    container_name: sentinela-notifier
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      DB_HOST: mysql
+      DB_NAME: ${MYSQL_DATABASE}
+      DB_USER: ${MYSQL_USER}
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+      TELEGRAM_TOKEN: ${TELEGRAM_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      TEMP_LIMITE: ${TEMP_LIMITE:-35}
+      OFFLINE_S: ${OFFLINE_S:-60}
+
+  api:
+    build: ./api
+    container_name: sentinela-api
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    environment:
+      DB_HOST: mysql
+      DB_NAME: ${MYSQL_DATABASE}
+      DB_USER: ${MYSQL_USER}
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+      API_KEY: ${API_KEY:-}
+      TEMP_LIMITE: ${TEMP_LIMITE:-35}
+      ONLINE_TIMEOUT_S: ${ONLINE_TIMEOUT_S:-30}
+
+volumes:
+  emqx_data:
+  mysql_data:
