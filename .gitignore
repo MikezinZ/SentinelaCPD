@@ -1,4 +1,42 @@
+<<<<<<< HEAD
 .env
 __pycache__/
 *.pyc
 *.zip
+=======
+# Arquivos de sistema do Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Configurações locais do VS Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+*.code-workspace
+
+# Build e arquivos temporários do Arduino
+build/
+*.hex
+*.elf
+*.bin
+
+# Docker & Banco de dados (caso salve volumes na pasta)
+*.log
+docker/data/
+docker/mysql_data/
+
+# Arquivos do sistema operacional macOS / Linux
+.DS_Store
+
+._*
+
+*.env
+.env
+
+# Credenciais 
+firmware/config.h
+
+>>>>>>> abb0ba39f287c2f1ed974b65b8859e27d9311732
