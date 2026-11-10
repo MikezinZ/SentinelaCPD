@@ -1,87 +1,3 @@
-# SentinelaCPD — Cloud (base)
-
-Broker EMQX + MySQL + serviço de ingestão (Python), tudo em Docker.
-
-## Subir
-
-```bash
-cp .env.example .env      # edite as senhas
-docker compose up -d --build
-docker compose logs -f ingestor
-```
-
-- MQTT: porta 1883 (ESP32 aponta para o IP do PC/servidor)
-- Dashboard EMQX: http://localhost:18083 (usuário `admin`, senha `public` — troque no primeiro acesso)
-- MySQL: porta 3306, banco `iot_db` (Workbench)
-
-## Contrato de mensagens
-
-| Tópico | Payload |
-| --- | --- |
-| `sentinela/<id>/telemetria` | `{"temperatura":27.8,"umidade":45.4,"corrente":0.8,"bateria":87}` (campos opcionais) |
-| `sentinela/<id>/evento` | `{"evento":"POWER_LOSS","estado":"ON_BATTERY","temperatura":29.4,"umidade":58.2,"bateria":87}` |
-| `esp32/telemetria` | legado da N1, sem id (gravado como `ESP32_CPD_01`) |
-
-Eventos válidos: `POWER_LOSS`, `LAST_GASP`, `POWER_RESTORED`.
-`POWER_LOSS`/`LAST_GASP` abrem um incidente; `POWER_RESTORED` fecha e calcula a duração.
-
-## Testar sem o ESP32
-
-```bash
-# telemetria (precisa do mosquitto-clients, ou use o MQTTX)
-mosquitto_pub -h localhost -t sentinela/ESP32_CPD_01/telemetria -m '{"temperatura":27.8,"umidade":45.4}'
-mosquitto_pub -h localhost -t sentinela/ESP32_CPD_01/evento -m '{"evento":"POWER_LOSS"}'
-mosquitto_pub -h localhost -t sentinela/ESP32_CPD_01/evento -m '{"evento":"POWER_RESTORED"}'
-```
-
-```sql
-SELECT * FROM leituras ORDER BY id DESC LIMIT 10;
-SELECT * FROM incidentes;
-```
-
-## API REST (para o app Mobile)
-
-Sobe junto com o resto. Documentação interativa (dá para testar clicando): http://localhost:8000/docs
-
-| Rota | O que devolve |
-| --- | --- |
-| `GET /health` | API e banco no ar (sem chave) |
-| `GET /api/status-cpd` | situação geral + último valor de cada dispositivo (online, alerta de temperatura, incidentes abertos) |
-| `GET /api/telemetria?dispositivo=&de=&ate=&limite=` | histórico, mais recente primeiro (limite máx. 1000) |
-| `GET /api/incidentes?dispositivo=&status=ABERTO\|FECHADO&limite=` | lista de incidentes com duração |
-| `GET /api/incidentes/{id}` | incidente + eventos ocorridos nele |
-| `GET /api/dispositivos` | dispositivos cadastrados |
-
-`status_geral` pode ser: `NORMAL`, `EM_INCIDENTE`, `ALERTA_TEMPERATURA`, `OFFLINE`, `SEM_DADOS`.
-Um dispositivo fica `online: false` se passar `ONLINE_TIMEOUT_S` (30 s) sem enviar dados.
-
-Para o celular acessar, use o IP do notebook: `http://<IP-do-notebook>:8000/api/status-cpd`
-(celular e notebook na mesma rede; libere a porta 8000 no firewall).
-Se definir `API_KEY` no `.env`, envie o cabeçalho `X-API-Key: <valor>` em todas as rotas `/api`.
-
-Ao atualizar de uma versão anterior: `docker compose up -d --build` (os dados do banco são mantidos).
-
-## Alertas por Telegram (serviço `notifier`)
-
-Avisa: incidente aberto, incidente fechado (com duração), temperatura acima de `TEMP_LIMITE`
-(e quando normaliza) e dispositivo sem enviar dados por `OFFLINE_S` segundos (e quando volta).
-
-1. Crie o bot com `@BotFather` (`/newbot`), abra o bot e envie `/start`.
-2. Coloque o token em `TELEGRAM_TOKEN` no `.env`. O token é uma senha: não publique nem mande em prints.
-3. Rode `docker compose up -d --build` e depois `docker compose logs notifier`.
-   Ele lista os chats que já falaram com o bot (`id=...`). Copie o seu id para `TELEGRAM_CHAT_ID` no `.env`.
-4. Rode `docker compose up -d` de novo. Chega a mensagem "serviço de alertas ativo".
-
-Sem token/chat id o serviço roda em modo teste (só escreve as mensagens no log).
-O histórico de incidentes anterior à primeira execução não gera avisos antigos.
-Perdeu o token? No `@BotFather`, `/revoke` gera outro e invalida o anterior.
-
-## Pendências conhecidas
-
-- Broker sem autenticação (fase de teste). Próximo passo: usuário/senha no MQTT e depois TLS.
-- Se mudar o `init.sql`, recrie o volume: `docker compose down -v` (apaga os dados).
-- Próximas etapas: API REST, notificações, Redis, OTA.
-=======
 # SentinelaCPD: Telemetria Ambiental e Auditoria de Continuidade Energética em Borda
 
 > **"A estabilidade do CPD não depende da sorte; depende da telemetria contínua na borda."**
@@ -95,6 +11,7 @@ Perdeu o token? No `@BotFather`, `/revoke` gera outro e invalida o anterior.
 ![MQTT](https://img.shields.io/badge/Protocolo-MQTT-660066?logo=mqtt&logoColor=white)
 ![EMQX](https://img.shields.io/badge/Broker-EMQX%205.x-00B173)
 ![MySQL](https://img.shields.io/badge/Banco-MySQL%208.0-4479A1?logo=mysql&logoColor=white)
+![FastAPI](https://img.shields.io/badge/API-FastAPI-009688?logo=fastapi&logoColor=white)
 ![Docker](https://img.shields.io/badge/Infra-Docker%20Compose-2496ED?logo=docker&logoColor=white)
 ![License](https://img.shields.io/badge/Licen%C3%A7a-MIT-green)
 
@@ -104,13 +21,15 @@ Perdeu o token? No `@BotFather`, `/revoke` gera outro e invalida o anterior.
 
 ---
 
-## 📌 Status do Projeto: Entrega N1 (v1)
+## 📌 Status do Projeto: Entrega N1 (v1) e Cloud N2 em andamento
 
 O SentinelaCPD concluiu sua **primeira etapa de validação física e arquitetural (N1)** no Projeto Integrador 6 (Engenharia da Computação, 2026.2).
 
 Nesta etapa, a plataforma coleta temperatura e umidade e calcula a corrente alternada eficaz ($I_{\text{RMS}}$) em um circuito de 220 V AC. Os dados seguem de um nó ESP32 até um broker MQTT (EMQX) em Docker e são gravados em um banco MySQL, onde podem ser consultados para auditoria.
 
-A N1 é uma **validação de bancada** do conceito e **uma parte do projeto**. A instalação em um CPD real, a calibração com instrumento de referência, o dashboard, os alertas e a alimentação por bateria estão previstos para etapas posteriores (ver [limitações](#limitações-conhecidas) e [roadmap](#roadmap-rumo-à-n2)).
+A N1 é uma **validação de bancada** do conceito e **uma parte do projeto**. A instalação em um CPD real, a calibração com instrumento de referência, a alimentação por bateria e o TLS estão previstos para etapas posteriores (ver [limitações](#limitações-conhecidas) e [roadmap](#roadmap-rumo-à-n2)).
+
+Na etapa N2, a camada de **Cloud** já tem implementados o serviço de ingestão, o modelo de incidentes de energia, a **API REST** para o aplicativo móvel e os **alertas por Telegram**. Veja a seção [Cloud: ingestão, API e alertas (N2)](#cloud-ingestão-api-e-alertas-n2).
 
 ---
 
@@ -125,12 +44,13 @@ A N1 é uma **validação de bancada** do conceito e **uma parte do projeto**. A
 7. [Hardware e pinagem](#hardware-e-pinagem)
 8. [Esquemático e circuito eletrônico](#esquemático-e-circuito-eletrônico)
 9. [Resultados experimentais (N1)](#resultados-experimentais-n1)
-10. [Limitações conhecidas](#limitações-conhecidas)
-11. [Princípios de engenharia](#princípios-de-engenharia-adotados)
-12. [Organização do repositório](#organização-do-repositório)
-13. [Como reproduzir](#como-reproduzir-o-projeto)
-14. [Roadmap](#roadmap-rumo-à-n2)
-15. [Licença](#licença-e-agradecimentos)
+10. [Cloud: ingestão, API e alertas (N2)](#cloud-ingestão-api-e-alertas-n2)
+11. [Limitações conhecidas](#limitações-conhecidas)
+12. [Princípios de engenharia](#princípios-de-engenharia-adotados)
+13. [Organização do repositório](#organização-do-repositório)
+14. [Como reproduzir](#como-reproduzir-o-projeto)
+15. [Roadmap](#roadmap-rumo-à-n2)
+16. [Licença](#licença-e-agradecimentos)
 
 ---
 
@@ -189,8 +109,10 @@ A primeira versão do SentinelaCPD tem como objetivos:
 | Persistência | MySQL 8.0 | ✅ |
 | Validação dos dados | MySQL Workbench | ✅ |
 | Teste físico | Cargas LED em 220 V AC | ✅ |
+| API REST para o aplicativo | FastAPI (ver [Cloud](#cloud-ingestão-api-e-alertas-n2)) | ✅ N2 |
+| Alertas por Telegram | Serviço `notifier` (ver [Cloud](#cloud-ingestão-api-e-alertas-n2)) | ✅ N2 |
 | Dashboard em tempo real | — | 🔄 N2 |
-| Alertas e TLS/MQTTS | — | 🔄 N2 |
+| TLS/MQTTS | — | 🔄 N2 |
 
 ---
 
@@ -204,7 +126,9 @@ A primeira versão do SentinelaCPD tem como objetivos:
 | **Formato de dados** | JSON | Payload leve com temperatura, umidade e corrente |
 | **Mensageria** | MQTT 3.1.1 sobre TCP (porta 1883), EMQX 5.x | Broker local, autenticação de dispositivo e regras SQL |
 | **Persistência** | MySQL 8.0 | Armazenamento relacional de séries temporais |
-| **Infraestrutura** | Docker e Docker Compose | Sobe EMQX e MySQL de forma reproduzível |
+| **Cloud (N2)** | Python 3 (`paho-mqtt`, `mysql-connector-python`), FastAPI + Uvicorn | Serviço de ingestão, modelo de incidentes, API REST e notificações |
+| **Alertas (N2)** | Telegram Bot API | Avisos de queda de energia, temperatura e dispositivo offline |
+| **Infraestrutura** | Docker e Docker Compose | Sobe EMQX, MySQL, ingestão, API e alertas de forma reproduzível |
 | **Ferramentas** | MySQL Workbench, Arduino IDE | Consulta e auditoria dos dados; gravação do firmware |
 | **Apresentação** | HTML, CSS e JavaScript (GitHub Pages) | Documentação pública do projeto |
 | **Versionamento** | Git e GitHub | Controle de código; segredos fora do repositório |
@@ -544,6 +468,125 @@ ORDER BY id;
 
 ---
 
+## Cloud: ingestão, API e alertas (N2)
+
+A camada de Cloud transforma a telemetria bruta da N1 em **informação de operação**: estado do CPD, incidentes de energia com duração, API para o aplicativo móvel e alertas ativos. Ela roda inteira em Docker Compose, na rede local, e foi validada de ponta a ponta com um ESP32 real (DHT22 → Wi-Fi → EMQX → MySQL → API → Telegram).
+
+> **Responsável:** Diogo Novaes. O código fica na raiz do repositório: `api/`, `ingestor/`, `notifier/`, `db/` e o `docker-compose.yml`.
+
+### Arquitetura
+
+```mermaid
+flowchart LR
+    ESP["ESP32 (borda)"] -->|"MQTT 1883"| EMQX["EMQX 5.8"]
+    EMQX -->|"sentinela/+/telemetria<br/>sentinela/+/evento"| ING["Ingestor (Python)"]
+    ING --> DB[("MySQL 8.0")]
+    DB --> API["API REST (FastAPI :8000)"]
+    DB --> NOT["Notifier (Python)"]
+    API -->|"JSON / X-API-Key"| APP["App Mobile / Web"]
+    NOT -->|"Bot API"| TG["Telegram"]
+```
+
+| Serviço | Imagem / tecnologia | Responsabilidade |
+| --- | --- | --- |
+| `emqx` | `emqx/emqx:5.8.0` | Broker MQTT (1883), dashboard (18083) e WebSocket (8083) |
+| `mysql` | `mysql:8.0` | Persistência; schema criado por `db/init.sql` |
+| `ingestor` | Python + `paho-mqtt` | Assina os tópicos, valida faixas, grava leituras e abre/fecha incidentes |
+| `api` | FastAPI + Uvicorn | Endpoints REST para o aplicativo, com CORS e `X-API-Key` opcional |
+| `notifier` | Python (`urllib`) | Consulta o banco a cada 5 s e envia alertas ao Telegram |
+
+> Na N1 a gravação era feita por Data Bridge e regra SQL do EMQX. Na Cloud, a ingestão passou para um serviço próprio (`ingestor`), porque o Data Bridge não expressa a lógica de **incidentes** (abrir, fechar e calcular duração) nem valida os dados. O tópico legado `esp32/telemetria` continua aceito e é gravado como `ESP32_CPD_01`.
+
+### Contrato de mensagens MQTT
+
+| Tópico | Payload |
+| --- | --- |
+| `sentinela/<id>/telemetria` | `{"temperatura":27.8,"umidade":45.4,"corrente":0.8,"bateria":87}` (campos opcionais) |
+| `sentinela/<id>/evento` | `{"evento":"POWER_LOSS","estado":"ON_BATTERY","temperatura":29.4,"umidade":58.2,"bateria":87}` |
+| `esp32/telemetria` | legado da N1, sem id |
+
+Eventos válidos: `POWER_LOSS`, `LAST_GASP` e `POWER_RESTORED`. `POWER_LOSS` e `LAST_GASP` abrem um incidente de queda de energia e colocam o dispositivo em `ON_BATTERY`; `POWER_RESTORED` fecha o incidente e calcula a duração.
+
+### Modelo de dados
+
+| Tabela | Conteúdo |
+| --- | --- |
+| `dispositivos` | id, nome, local, estado, criado_em, ultimo_contato |
+| `leituras` | dispositivo_id, temperatura, umidade, corrente, bateria, data_hora |
+| `eventos` | dispositivo_id, tipo, payload (JSON), data_hora |
+| `incidentes` | dispositivo_id, tipo (`QUEDA_ENERGIA`), status (`ABERTO`/`FECHADO`), inicio, fim, duracao_s |
+| `notificacoes` | controle de alertas já enviados, para não repetir (chave única `tipo` + `referencia_id`) |
+
+### API REST (para o aplicativo)
+
+Documentação interativa em `http://<host>:8000/docs`. Se `API_KEY` estiver definida no `.env`, envie o cabeçalho `X-API-Key` nas rotas `/api`.
+
+| Rota | O que devolve |
+| --- | --- |
+| `GET /health` | API e banco no ar (sem chave) |
+| `GET /api/status-cpd` | situação geral e último valor de cada dispositivo (online, alerta de temperatura, incidentes abertos) |
+| `GET /api/telemetria?dispositivo=&de=&ate=&limite=` | histórico, mais recente primeiro (máx. 1000) |
+| `GET /api/incidentes?dispositivo=&status=&limite=` | lista de incidentes com duração |
+| `GET /api/incidentes/{id}` | incidente e eventos ocorridos nele |
+| `GET /api/dispositivos` | dispositivos cadastrados |
+
+`status_geral` assume `NORMAL`, `EM_INCIDENTE`, `ALERTA_TEMPERATURA`, `OFFLINE` ou `SEM_DADOS`. Um dispositivo fica `online: false` após `ONLINE_TIMEOUT_S` (30 s) sem enviar dados.
+
+### Alertas por Telegram
+
+| Situação | Aviso |
+| --- | --- |
+| Incidente de energia aberto | 🔴 queda de energia detectada |
+| Incidente fechado | 🟢 energia restabelecida, com a duração |
+| Temperatura acima de `TEMP_LIMITE` | 🌡️ alerta; avisa também quando normaliza (histerese de 1 °C) |
+| Dispositivo sem dados por `OFFLINE_S` | ⚠️ dispositivo offline; avisa quando volta |
+
+Detalhes de projeto: um alerta de offline só é emitido para dispositivo que já esteve online, a tabela `notificacoes` evita duplicidade, incidentes anteriores à primeira execução não geram avisos antigos e o token nunca é escrito no log. Sem token, o serviço roda em modo teste e apenas registra as mensagens.
+
+### Como subir
+
+```bash
+cp .env.example .env        # defina senhas, TELEGRAM_TOKEN e TELEGRAM_CHAT_ID
+docker compose up -d --build
+docker compose logs -f ingestor
+```
+
+Variáveis (`.env.example`): `MYSQL_*`, `API_KEY`, `TEMP_LIMITE` (35), `ONLINE_TIMEOUT_S` (30), `OFFLINE_S` (60), `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID`.
+
+> 🔒 O arquivo `.env` contém senhas e o token do bot. Ele está no `.gitignore` e **nunca** deve ser publicado. Se o token vazar, gere outro com `/revoke` no `@BotFather`.
+
+Teste sem o ESP32:
+
+```bash
+mosquitto_pub -h localhost -t sentinela/ESP32_CPD_01/telemetria -m '{"temperatura":27.8,"umidade":45.4}'
+mosquitto_pub -h localhost -t sentinela/ESP32_CPD_01/evento -m '{"evento":"POWER_LOSS"}'
+mosquitto_pub -h localhost -t sentinela/ESP32_CPD_01/evento -m '{"evento":"POWER_RESTORED"}'
+```
+
+### O que foi validado
+
+* ✅ ESP32 real publicando temperatura e umidade a cada 5 s até o banco e a API.
+* ✅ Abertura e fechamento de incidente (via evento MQTT) com cálculo de duração e alertas no Telegram.
+* ✅ Alerta de dispositivo offline e de retorno.
+* ✅ API consultada pelo Swagger e pelo navegador.
+* ⏳ Não testado ao vivo: alerta de temperatura (apenas simulado em teste automatizado).
+* ⏳ Os eventos de queda de energia foram **simulados** por publicação MQTT, sem corte real de energia. O firmware da Cloud ainda não envia `corrente` e `bateria`.
+
+### Decisões de arquitetura e próximos passos
+
+Itens abaixo são **propostas**; ainda não estão implementados.
+
+| Tema | Decisão |
+| --- | --- |
+| Banco de dados | Manter MySQL no volume atual; migrar para TimescaleDB se o volume de séries temporais crescer. MongoDB descartado: o modelo é relacional (dispositivo, leitura, incidente). |
+| Redis | Cache do último estado por dispositivo, rate limit e pub/sub para empurrar eventos ao app. |
+| OTA | Atualização por HTTPS disparada via MQTT, partições duplas, verificação SHA-256 e rollback automático. |
+| Segurança | Usuário/senha e ACL por tópico no EMQX, depois TLS (8883); JWT na API; backup e retenção de dados. |
+| IA | Abordagem híbrida: regras e z-score para anomalias simples, Isolation Forest para padrões multivariados. |
+| Tempo real | WebSocket ou push para o aplicativo, em substituição ao polling. |
+
+---
+
 ## Limitações conhecidas
 
 Esta é a primeira versão do sistema. Estes pontos serão tratados nas próximas etapas:
@@ -552,8 +595,9 @@ Esta é a primeira versão do sistema. Estes pontos serão tratados nas próxima
 * **Faixa de medição:** o ZMCT103C é dimensionado para correntes de até 5 A. Os testes foram feitos com cargas de poucas dezenas de miliampères, onde a resolução é menor.
 * **Latência ponta a ponta:** ainda não foi medida. O campo `data_hora` registra o momento da gravação no banco e não permite calcular a latência isoladamente.
 * **Firmware:** o cálculo do RMS bloqueia o laço por 200 ms a cada ciclo e a reconexão MQTT é bloqueante. Se o DHT22 falhar, a leitura do ciclo inteiro (inclusive a corrente) não é publicada.
-* **Segurança da comunicação:** o tráfego MQTT ainda está em texto claro (porta 1883). TLS está previsto para a N2.
-* **Visualização:** a consulta aos dados é feita pelo MySQL Workbench. Não há dashboard ainda.
+* **Segurança da comunicação:** o tráfego MQTT ainda está em texto claro (porta 1883). TLS está previsto para a N2. Na stack de Cloud em fase de testes, o broker ainda não exige usuário e senha.
+* **Eventos de energia:** o fluxo de incidentes foi validado com eventos simulados; a detecção real (Last-Gasp com bateria) depende da integração do firmware.
+* **Visualização:** a consulta aos dados é feita pelo MySQL Workbench, pela API e pelo dashboard web em desenvolvimento.
 
 ---
 
@@ -563,6 +607,7 @@ Esta é a primeira versão do sistema. Estes pontos serão tratados nas próxima
 * **Local-first e resiliência:** processamento e armazenamento ficam no perímetro local do CPD.
 * **Proteção de segredos:** variáveis de ambiente em `.env` e parâmetros locais em `config.h`, ambos fora do controle de versão pelo `.gitignore`. Os arquivos `.env.example` e `config.example.h` servem de modelo.
 * **Envio periódico sem `delay`:** um temporizador por software (`millis()`) controla o intervalo de 5 s no laço principal. O cálculo do RMS e a reconexão MQTT ainda são bloqueantes (ver [Limitações](#limitações-conhecidas)).
+* **Infraestrutura como código:** toda a Cloud sobe com um único `docker compose up`, o que permite reproduzir o ambiente em qualquer máquina.
 
 ---
 
@@ -588,12 +633,23 @@ SentinelaCPD/
 │   ├── firmware.ino        # Amostragem, RMS e loop MQTT
 │   └── config.example.h    # Modelo de configuração (Wi-Fi, broker, pinos)
 │
-└── docker/                 # Backend
-    ├── docker-compose.yml  # Serviços EMQX e MySQL 8.0
-    ├── .env.example        # Modelo de variáveis de ambiente
-    ├── EMQX_SETUP.md        # Configuração manual e verificação
-    └── mysql/
-        └── init.sql       # Schema de telemetria (volume novo)
+├── docker/                 # Backend da N1
+│   ├── docker-compose.yml  # Serviços EMQX e MySQL 8.0
+│   ├── .env.example        # Modelo de variáveis de ambiente
+│   ├── EMQX_SETUP.md       # Configuração manual e verificação
+│   └── mysql/
+│       └── init.sql        # Schema de telemetria (volume novo)
+│
+├── web/                    # Dashboard web
+│
+│   # Cloud da N2 (ingestão, API e alertas)
+├── docker-compose.yml      # EMQX, MySQL, ingestor, api e notifier
+├── .env.example            # Modelo de variáveis da Cloud (sem segredos)
+├── db/
+│   └── init.sql            # Schema: dispositivos, leituras, eventos, incidentes
+├── ingestor/               # Assinatura MQTT e gravação no banco
+├── api/                    # API REST (FastAPI)
+└── notifier/               # Alertas por Telegram
 ```
 
 ---
@@ -627,6 +683,8 @@ docker compose up -d
 
 > Troque a senha padrão do administrador do EMQX no primeiro acesso.
 
+Para subir a stack completa da N2 (ingestão, API e alertas), use o `docker-compose.yml` da raiz no lugar do da pasta `docker/`, conforme a seção [Cloud](#como-subir). Não rode as duas ao mesmo tempo, pois usam as mesmas portas.
+
 ### 2. Banco de dados e regra de ingestão
 
 A tabela `iot_db.leituras_dht22` armazena as leituras com as colunas:
@@ -646,6 +704,8 @@ A configuração descrita para a bancada utiliza também `mqtt_user` e `mqtt_acl
 Em um volume novo, `docker/mysql/init.sql` cria automaticamente a tabela de telemetria no banco definido por `MYSQL_DATABASE` (use `iot_db`). Usuários MySQL definidos no Compose também são criados apenas na primeira inicialização.
 
 Siga [Configuração EMQX → MySQL](docker/EMQX_SETUP.md) para criar o Connector, a regra SQL, o Sink e configurar a autenticação MQTT. A configuração do EMQX é manual; o Compose, sozinho, não provisiona esse pipeline. O guia inclui cuidados para volumes já existentes e verificação dos registros.
+
+> Na stack da Cloud (raiz do repositório), o schema usa as tabelas `leituras`, `eventos` e `incidentes`, criadas automaticamente pelo `db/init.sql`, e não depende do Data Bridge.
 
 ### 3. Firmware
 
@@ -677,13 +737,18 @@ Siga [Configuração EMQX → MySQL](docker/EMQX_SETUP.md) para criar o Connecto
 
 ### Marco N2 (em desenvolvimento)
 
+- [x] Serviço de ingestão em Python com modelo de incidentes de energia (abertura, fechamento e duração).
+- [x] API REST para o aplicativo móvel e web.
+- [x] Alertas por Telegram (queda de energia, temperatura, dispositivo offline).
+- [x] Infraestrutura da Cloud reproduzível com Docker Compose.
 - [ ] Alimentação de contingência com bateria 18650 (a placa já possui suporte e circuito de carga).
+- [ ] Detecção real de queda de energia e envio de `LAST_GASP` pelo firmware.
 - [ ] Dashboard web em tempo real via WebSockets.
 - [ ] Consumo acumulado (kWh) e estimativa de custo.
-- [ ] Alertas por Webhook ou Telegram para violação de limites térmicos.
-- [ ] Comunicação criptografada com TLS (MQTTS, porta 8883).
+- [ ] Autenticação e ACL no MQTT e comunicação criptografada com TLS (MQTTS, porta 8883).
 - [ ] Calibração da corrente com instrumento de referência e medição de latência.
 - [ ] Reconexão MQTT não bloqueante e `cliente_id` fixo por placa (baseado no MAC).
+- [ ] Redis (cache de estado e pub/sub), atualização OTA e detecção de anomalias com IA (propostas documentadas).
 
 ---
 
