@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # SentinelaCPD — Cloud (base)
 
 Broker EMQX + MySQL + serviço de ingestão (Python), tudo em Docker.
@@ -697,5 +696,3 @@ Agradecimentos ao corpo docente de Engenharia da Computação e às comunidades 
 ---
 
 > **Desenvolvido por Miguel Melo, Diego Ximenes e Diogo Novaes** — Projeto Integrador 6 / Engenharia da Computação (2026.2).
-
->>>>>>> abb0ba39f287c2f1ed974b65b8859e27d9311732
