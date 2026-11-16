@@ -18,6 +18,7 @@ import type {
 } from '../types/index.ts';
 
 export const scenarios = {
+  power: 'Queda de energia (em bateria)',
   normal: '1. CPD Operacional Normal (fresh)',
   critical: '2. Alerta Ativo de Temperatura Crítica (> 27 °C)',
   stale: '3. Telemetria Antiga (stale > 15s)',
@@ -33,6 +34,7 @@ export const scenarios = {
 export type Scenario = keyof typeof scenarios;
 
 export const scenarioDescriptions: Record<Scenario, string> = {
+  power: 'POWER_LOSS recebido; dispositivo em bateria e histórico de queda anterior.',
   normal: 'Todos os sensores operando normalmente (quality: ok) e pacotes recentes (<= 15s).',
   critical: 'Rack Principal com temperatura em 30,8 °C (> 27 °C) e alerta crítico ativo.',
   stale: 'Rack Principal sem receber pacotes há mais de 15s. Exibe banner de dados armazenados.',
@@ -208,6 +210,7 @@ function buildAlerts(): Alert[] {
   };
 
   switch (currentScenario) {
+    case 'power': return [fixture('demo-power', 'power_loss', 'critical', 'POWER_LOSS / LAST_GASP recebido do dispositivo.'), fixture('demo-battery', 'battery_low', 'warning', 'Bateria baixa (18%).'), resolved];
     case 'critical':
       return [
         fixture(
@@ -297,6 +300,8 @@ function buildDevices(): Device[] {
       enabled,
       firmware_version: '0.2.0-esp32',
       server_time: iso(now),
+      power_state: primary && currentScenario === 'power' ? 'battery' : 'mains',
+      battery_pct: primary && currentScenario === 'power' ? 18 : null,
       stale_after_seconds: 15,
       latest,
       freshness: 'fresh',
@@ -512,7 +517,7 @@ export async function mockRequest({
     return { ...alert, ...audit };
   }
 
-  const deviceMatch = route.match(/^\/devices\/([^/]+)(?:\/(readings|limits))?$/);
+  const deviceMatch = route.match(/^\/devices\/([^/]+)(?:\/(readings|limits|incidents))?$/);
   if (deviceMatch) {
     const [, rawId, subResource] = deviceMatch;
     const deviceId = decodeURIComponent(rawId);
@@ -520,6 +525,13 @@ export async function mockRequest({
     if (!device) throw new ApiError(404, 'Dispositivo não encontrado.');
 
     if (!subResource) return device;
+    if (subResource === 'incidents' && method === 'GET') {
+      const items = currentScenario === 'power' && device.id === 'cpd-01' ? [
+        { id: 'power-open', type: 'power_loss', status: 'open', started_at: iso(changedAt - 180_000), ended_at: null, duration_s: null },
+        { id: 'power-closed', type: 'power_loss', status: 'closed', started_at: iso(changedAt - 86400_000), ended_at: iso(changedAt - 85800_000), duration_s: 600 },
+      ] : [];
+      return paginate(items, query.cursor ?? null, 50);
+    }
     if (subResource === 'readings') return buildHistory(device, query);
 
     if (user.role !== 'admin') {

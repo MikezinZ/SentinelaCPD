@@ -344,7 +344,7 @@ export function StaleBanner({ lastTimestamp }: { lastTimestamp?: string | null }
     <Banner title="Dados armazenados — conexão indisponível" tone="amber">
       {lastTimestamp
         ? `Exibindo última leitura recebida em ${dateTime(lastTimestamp)}. Leituras antigas nunca são apresentadas como atuais.`
-        : 'Os nós marcados como desatualizados há mais de 15 segundos exibem a última amostra registrada com seu horário original.'}
+        : 'Os nós marcados como fora do prazo de telemetria definido pelo servidor exibem a última amostra registrada com seu horário original.'}
     </Banner>
   );
 }

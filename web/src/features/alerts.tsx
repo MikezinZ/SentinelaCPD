@@ -12,7 +12,7 @@ const states = { active: 'Ativo', acknowledged: 'Reconhecido', resolved: 'Resolv
 const severities = { warning: 'Atenção', critical: 'Crítico' } as const;
 const labels = {
   temperature_high: 'Temperatura alta', temperature_low: 'Temperatura baixa', humidity_high: 'Umidade alta', humidity_low: 'Umidade baixa',
-  current_high: 'Corrente RMS alta', telemetry_stale: 'Telemetria desatualizada', sensor_invalid: 'Sensor inválido',
+  current_high: 'Corrente RMS alta', telemetry_stale: 'Telemetria desatualizada', sensor_invalid: 'Sensor inválido', power_loss: 'Queda de energia', battery_low: 'Bateria baixa',
 } as const;
 
 function Acknowledge({ alert, onSaved }: { alert: Alert; onSaved: () => void }) {

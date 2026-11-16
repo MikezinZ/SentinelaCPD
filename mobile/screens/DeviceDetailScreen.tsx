@@ -1,3 +1,4 @@
+import { powerLabel } from '../types';
 import React from 'react';
 import {
   Pressable,
@@ -147,7 +148,9 @@ export function DeviceDetailScreen() {
               </Banner>
             ) : null}
 
-            {/* Metadados do Nó: Status, Timestamp Exato e Firmware */}
+            <Text className="font-bold text-amber-800 bg-amber-50 p-3">{powerLabel(device)}</Text>
+<EnergyIncidents id={deviceId}/>
+{/* Metadados do Nó: Status, Timestamp Exato e Firmware */}
             <Card className="mb-4">
               <View className="flex-row items-center justify-between pb-3 border-b border-slate-100">
                 <View className="flex-row items-center gap-2">
@@ -308,3 +311,19 @@ export function DeviceDetailScreen() {
   );
 }
 
+
+function EnergyIncidents({ id }: { id: string }) {
+  const result = useResource('incidents:' + id, signal => api.incidents(id, signal), true);
+  return <Card className="mb-4">
+    <Text className="font-bold text-lg">Histórico de quedas de energia</Text>
+    {result.error && <FailureBanner error={result.error} cached={!!result.data} onRetry={result.reload}/>}
+    {result.busy && !result.data && <LoadingState label="Carregando incidentes…"/>}
+    {result.data?.length === 0 && <Text>Nenhuma queda registrada.</Text>}
+    {result.data?.map(item => <View key={item.id} className="py-3">
+      <Text>{item.status === 'open' ? 'Em andamento' : 'Encerrada'}</Text>
+      <Text>Início {dateTime(item.started_at)}</Text>
+      <Text>Fim {item.ended_at ? dateTime(item.ended_at) : '—'}</Text>
+      <Text>Duração {item.duration_s == null ? 'Em andamento' : item.duration_s + ' s'}</Text>
+    </View>)}
+  </Card>;
+}

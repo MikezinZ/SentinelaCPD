@@ -88,7 +88,22 @@ export function createApi(send: Transport = transport) {
     }
   }
   const device = (id: string) => '/devices/' + encodeURIComponent(id);
+  async function allIncidents(id: string, signal?: AbortSignal) {
+    const items: import('../contracts/index').EnergyIncident[] = [];
+    let cursor: string | undefined;
+    const seen = new Set<string>();
+    do {
+      const page = await request<import('../contracts/index').IncidentPage>(
+        device(id) + '/incidents' + query({ cursor }), 'GET', undefined, signal);
+      items.push(...page.items);
+      cursor = page.next_cursor ?? undefined;
+      if (cursor && seen.has(cursor)) throw new ApiError(400, 'Cursor repetido nos incidentes.');
+      if (cursor) seen.add(cursor);
+    } while (cursor);
+    return items;
+  }
   return {
+    incidents: allIncidents,
     onExpired(callback: () => void) { onExpired = callback; },
     async login(email: string, password: string) {
       clear();

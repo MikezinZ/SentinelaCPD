@@ -21,7 +21,7 @@ export const alertTypeLabels: Record<AlertType, string> = {
   humidity_low: 'Umidade baixa',
   current_high: 'Corrente RMS alta',
   telemetry_stale: 'Telemetria desatualizada',
-  sensor_invalid: 'Sensor inválido',
+  sensor_invalid: 'Sensor inválido', power_loss: 'Queda de energia', battery_low: 'Bateria baixa',
 };
 
 export function AcknowledgeModal({

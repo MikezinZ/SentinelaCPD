@@ -94,3 +94,25 @@ test('renovação concorrente usa uma tentativa e expiração limpa a sessão', 
   assert.equal(expired, 1);
   setScenario('normal');
 });
+
+test('energia explícita e freshness configurável', async () => {
+  const api = await login('viewer');
+  setScenario('power');
+  try {
+    const device = await api.device('cpd-01');
+    assert.equal(device.power_state, 'battery');
+    assert.equal(device.battery_pct, 18);
+    const incidents = await api.incidents(device.id);
+    assert.equal(incidents[0].status, 'open');
+    assert.equal(incidents[0].duration_s, null);
+    assert.equal(incidents[1].duration_s, 600);
+    assert.deepEqual(await api.incidents('cpd-02'), []);
+    const alerts = await api.alerts({device_id: device.id});
+    assert.equal(alerts.items.find(a => a.type === 'power_loss')?.severity, 'critical');
+    assert.equal(alerts.items.find(a => a.type === 'battery_low')?.severity, 'warning');
+    const server = device.latest!.received_at;
+    assert.equal(freshness({...device, stale_after_seconds: 30}, 30000, server), 'fresh');
+    assert.equal(freshness({...device, stale_after_seconds: 30}, 30001, server), 'stale');
+    assert.equal(freshness({...device, stale_after_seconds: undefined}, 15001, server), 'stale');
+  } finally { setScenario('normal'); }
+});

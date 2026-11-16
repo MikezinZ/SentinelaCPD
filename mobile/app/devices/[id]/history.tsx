@@ -1,6 +1,6 @@
 import React from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { DeviceHistoryScreen } from '../../screens/DeviceHistoryScreen';
+import { DeviceHistoryScreen } from '../../../screens/DeviceHistoryScreen';
 
 export default function DeviceHistoryRoute() {
   return (

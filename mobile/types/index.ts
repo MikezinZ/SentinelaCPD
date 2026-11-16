@@ -35,9 +35,11 @@ export type Device = {
   enabled: boolean;
   firmware_version: string;
   freshness: Freshness;
-  stale_after_seconds: number;
+  stale_after_seconds?: number;
   server_time?: string;
   latest: Sample | null;
+  power_state: 'mains' | 'battery' | 'unknown';
+  battery_pct: number | null;
   active_alerts: number;
 };
 
@@ -58,7 +60,7 @@ export type AlertType =
   | 'humidity_low'
   | 'current_high'
   | 'telemetry_stale'
-  | 'sensor_invalid';
+  | 'sensor_invalid' | 'power_loss' | 'battery_low';
 
 export type Alert = {
   id: string;
@@ -164,8 +166,8 @@ export function reading(sample: Sample | null, metric: Metric): number | null {
  * Cálculo de Freshness:
  * - inactive: Dispositivo desativado no cadastro (`!device.enabled`)
  * - unknown: Nenhuma medição registrada (`!device.latest`)
- * - stale: Mais de 15 segundos sem leitura (`age > 15_000` ou `device.freshness === 'stale'`)
- * - fresh: Última amostra recebida há <= 15 segundos
+ * - stale: Mais de 15 segundos sem leitura (`age > (device.stale_after_seconds ?? 15) * 1000` ou `device.freshness === 'stale'`)
+ * - fresh: Última amostra dentro do prazo do servidor
  */
 export function freshness(
   device: Device,
@@ -176,7 +178,7 @@ export function freshness(
   if (!device.latest) return 'unknown';
   if (!serverTime) return device.freshness;
   const age = Date.parse(serverTime) - Date.parse(device.latest.received_at) + elapsed;
-  return device.freshness === 'stale' || age > 15_000 ? 'stale' : 'fresh';
+  return device.freshness === 'stale' || age > (device.stale_after_seconds ?? 15) * 1000 ? 'stale' : 'fresh';
 }
 
 export function validateLimits(value: Limits): Record<string, string> {
@@ -278,4 +280,18 @@ export function buildChartPoints(
     }
   }
   return rows;
+}
+
+export type EnergyIncident = {
+  id: string;
+  type: 'power_loss';
+  status: 'open' | 'closed';
+  started_at: string;
+  ended_at: string | null;
+  duration_s: number | null;
+};
+export type IncidentPage = { items: EnergyIncident[]; next_cursor?: string | null };
+export function powerLabel(device: Device): string {
+  const state = device.power_state === 'battery' ? 'Em bateria' : device.power_state === 'mains' ? 'Rede elétrica' : 'Energia desconhecida';
+  return state + ' · Bateria ' + (device.battery_pct == null ? 'indisponível' : device.battery_pct + '%');
 }

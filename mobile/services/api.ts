@@ -26,11 +26,11 @@ const envUseMocks =
     ? process.env.EXPO_PUBLIC_USE_MOCKS
     : undefined;
 
-export const useMocks = envUseMocks === undefined ? true : envUseMocks === 'true';
+export const useMocks = envUseMocks === 'true';
 
 export const apiBase = (
-  (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_API_BASE) ||
-  '/api/v2'
+  (typeof process !== 'undefined' && process.env.EXPO_PUBLIC_API_BASE) ||
+  ''
 ).replace(/\/$/, '');
 
 const buildQuery = (params: Record<string, string | undefined>): string => {
@@ -61,6 +61,9 @@ export const defaultTransport: Transport = async <T>(
 ): Promise<T> => {
   if (useMocks) {
     return (await mockRequest({ path, method, body, token, signal })) as T;
+  }
+  if (!/^https?:\/\//.test(apiBase)) {
+    throw new ApiError(0, 'Configuração inválida: defina EXPO_PUBLIC_API_BASE com a URL da API na rede local, por exemplo http://192.168.0.10:8000/api/v2.');
   }
   const response = await fetch(apiBase + path, {
     method,
@@ -279,7 +282,22 @@ export function createApi(
 
   const devicePath = (id: string) => `/devices/${encodeURIComponent(id)}`;
 
+  async function allIncidents(id: string, signal?: AbortSignal) {
+    const items: import('../types/index').EnergyIncident[] = [];
+    let cursor: string | undefined;
+    const seen = new Set<string>();
+    do {
+      const page = await request<import('../types/index').IncidentPage>(
+        devicePath(id) + '/incidents' + buildQuery({ cursor }), 'GET', undefined, signal);
+      items.push(...page.items);
+      cursor = page.next_cursor ?? undefined;
+      if (cursor && seen.has(cursor)) throw new ApiError(400, 'Cursor repetido nos incidentes.');
+      if (cursor) seen.add(cursor);
+    } while (cursor);
+    return items;
+  }
   return {
+    incidents: allIncidents,
     onExpired(callback: () => void) {
       onExpiredCallback = callback;
     },

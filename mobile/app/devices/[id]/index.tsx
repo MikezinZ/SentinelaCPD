@@ -1,6 +1,6 @@
 import React from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { DeviceDetailScreen } from '../../screens/DeviceDetailScreen';
+import { DeviceDetailScreen } from '../../../screens/DeviceDetailScreen';
 
 export default function DeviceDetailRoute() {
   return (

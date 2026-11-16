@@ -1,3 +1,4 @@
+import { powerLabel } from '../contracts';
 import { Activity, ArrowLeft, ArrowRight, BellRing, ChevronRight, Clock3, Cpu, FlaskConical, LayoutGrid, List, MapPin, Radio, RefreshCw, Search, Server, ShieldAlert } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
@@ -21,7 +22,7 @@ function RackCard({ device }: { device: Device }) {
   return <article className="rack-card">
     <div className="rack-top"><div className="rack-symbol"><Server size={20}/></div><Status value={device.freshness}/></div>
     <h3><Link to={'/devices/' + encodeURIComponent(id)}>{name}</Link></h3>
-    <div className="rack-location"><MapPin size={14}/>{location}</div>
+    <p className={device.power_state === "battery" ? "badge amber" : ""}>{powerLabel(device)}</p><div className="rack-location"><MapPin size={14}/>{location}</div>
     <div className="rack-metrics">{metricKeys.map(metric => {
       const Icon = metricIcons[metric];
       return <div key={metric}><span className={'metric-label ' + metric}><Icon size={14}/>{metric === 'current' ? 'Corrente' : metrics[metric].label}</span><strong><MetricValue device={device} metric={metric}/></strong></div>;
@@ -31,8 +32,8 @@ function RackCard({ device }: { device: Device }) {
 }
 const stats = [
   ['Dispositivos', Server, 'blue', 'Dispositivos cadastrados'],
-  ['Leitura recente', Radio, 'green', 'Amostra recebida em até 15 s'],
-  ['Sem telemetria recente', Clock3, 'amber', 'Amostra recebida há mais de 15 s'],
+  ['Leitura recente', Radio, 'green', 'Amostra dentro do prazo do servidor'],
+  ['Sem telemetria recente', Clock3, 'amber', 'Amostra fora do prazo do servidor'],
   ['Alertas abertos', BellRing, 'red', 'Ativos e reconhecidos'],
 ] as const;
 export function Devices({ scenario, change }: { scenario: Scenario; change: (value: Scenario) => void }) {
@@ -66,7 +67,7 @@ export function Devices({ scenario, change }: { scenario: Scenario; change: (val
     <section className="stats-grid" aria-label="Resumo do CPD">{stats.map(([label, Icon, tone, detail], index) => <article className="stat" key={label}><div className="stat-head"><span>{label}</span><div className={'stat-icon ' + tone}><Icon size={18}/></div></div><strong>{result.data ? values[index] : '—'}</strong><small>{detail}</small></article>)}</section>
     <section aria-labelledby="racks-title"><div className="section-bar"><div><h2 id="racks-title">Dispositivos <span className="count">{devices.length}</span></h2><p>Selecione um rack para acessar suas leituras e seu histórico.</p></div><div className="section-actions"><label className="search"><Search size={16}/><input aria-label="Buscar dispositivo" placeholder="Buscar dispositivo…" value={search} onChange={event => setSearch(event.target.value)}/></label><div className="segments" aria-label="Modo de exibição"><button aria-label="Exibir em cartões" aria-pressed={view === 'cards'} onClick={() => setView('cards')}><LayoutGrid size={16}/></button><button aria-label="Exibir em tabela" aria-pressed={view === 'table'} onClick={() => setView('table')}><List size={17}/></button></div></div></div>
     {result.busy && !result.data ? <Loading/> : !filtered.length ? <Empty title={search ? 'Nenhum rack encontrado' : 'Nenhum dispositivo disponível'}>{search ? 'Tente outro termo de busca.' : 'Os dispositivos cadastrados aparecem aqui.'}</Empty> : view === 'cards' ? <div className="rack-grid">{filtered.map(device => <RackCard key={device.id} device={device}/>)}</div> :
-    <div className="table-wrap"><table><thead><tr><th>Dispositivo</th><th>Localização</th><th>Status</th>{metricKeys.map(metric => <th key={metric}>{metrics[metric].label}</th>)}<th>Última amostra</th><th>Alertas abertos</th></tr></thead><tbody>{filtered.map(device => <tr key={device.id}><td><Link to={'/devices/' + encodeURIComponent(device.id)}>{device.name}</Link></td><td>{device.location}</td><td><Status value={device.freshness}/></td>{metricKeys.map(metric => <td key={metric}><MetricValue device={device} metric={metric}/></td>)}<td>{dateTime(device.latest?.sampled_at ?? device.latest?.received_at)}</td><td>{device.active_alerts}</td></tr>)}</tbody></table></div>}
+    <div className="table-wrap"><table><thead><tr><th>Dispositivo</th><th>Localização</th><th>Status</th>{metricKeys.map(metric => <th key={metric}>{metrics[metric].label}</th>)}<th>Última amostra</th><th>Alertas abertos</th></tr></thead><tbody>{filtered.map(device => <tr key={device.id}><td><Link to={'/devices/' + encodeURIComponent(device.id)}>{device.name}</Link></td><td>{device.location}</td><td><Status value={device.freshness}/><p className={device.power_state === "battery" ? "badge amber" : ""}>{powerLabel(device)}</p></td>{metricKeys.map(metric => <td key={metric}><MetricValue device={device} metric={metric}/></td>)}<td>{dateTime(device.latest?.sampled_at ?? device.latest?.received_at)}</td><td>{device.active_alerts}</td></tr>)}</tbody></table></div>}
     </section>
   </>;
 }
@@ -85,7 +86,7 @@ export function DeviceDetails({ role }: { role: Role }) {
     {device && <>
       {!result.error && status === 'stale' && <Banner title="Dados armazenados — conexão indisponível">Última amostra registrada em {dateTime(device.latest?.sampled_at ?? device.latest?.received_at)}.</Banner>}
       {status === 'unknown' && <Banner title="Aguardando primeira leitura" tone="blue"/>}
-      <div className="device-meta"><div><Radio size={19}/><span>Status</span><Status value={status}/></div><div><Clock3 size={19}/><span>Última amostra</span><strong>{dateTime(device.latest?.sampled_at ?? device.latest?.received_at)}</strong></div><div><Cpu size={19}/><span>Firmware</span><strong>{device.firmware_version || '—'}</strong></div></div>
+      <p className="badge amber">{powerLabel(device)}</p><EnergyIncidents id={id}/><div className="device-meta"><div><Radio size={19}/><span>Status</span><Status value={status}/></div><div><Clock3 size={19}/><span>Última amostra</span><strong>{dateTime(device.latest?.sampled_at ?? device.latest?.received_at)}</strong></div><div><Cpu size={19}/><span>Firmware</span><strong>{device.firmware_version || '—'}</strong></div></div>
       <div className="detail-grid">{metricKeys.map(metric => {
         const Icon = metricIcons[metric], value = reading(device.latest, metric);
         const quality = device.latest?.quality[metric];
@@ -94,4 +95,18 @@ export function DeviceDetails({ role }: { role: Role }) {
       <div className="device-links"><Link className="button primary" to={url + '/history'}><Activity size={17}/> Histórico <ChevronRight size={16}/></Link><Link className="button" to={'/alerts?device_id=' + encodeURIComponent(id)}><BellRing size={17}/> Alertas ({device.active_alerts})</Link>{role === 'admin' && <Link className="button" to={url + '/limits'}><ShieldAlert size={17}/> Configurar limites</Link>}</div>
     </>}
   </>;
+}
+
+function EnergyIncidents({ id }: { id: string }) {
+  const result = useResource('incidents:' + id, signal => api.incidents(id, signal), true);
+  return <section className="rack-card">
+    <h2>Histórico de quedas de energia</h2>
+    {result.error && <Failure error={result.error} cached={!!result.data}/>}
+    <button className="button" onClick={result.reload}>Atualizar incidentes</button>
+    {result.busy && !result.data && <Loading/>}
+    {result.data?.length === 0 && <p>Nenhuma queda registrada.</p>}
+    {result.data?.map(item => <p key={item.id}>
+      {item.status === 'open' ? 'Em andamento' : 'Encerrada'} · Início {dateTime(item.started_at)} · Fim {item.ended_at ? dateTime(item.ended_at) : '—'} · Duração {item.duration_s == null ? 'Em andamento' : item.duration_s + ' s'}
+    </p>)}
+  </section>;
 }

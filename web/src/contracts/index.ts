@@ -11,13 +11,15 @@ export type Sample = {
 };
 export type Device = {
   id: string; name: string; location: string; enabled: boolean; firmware_version: string;
-  freshness: Freshness; stale_after_seconds: number; server_time?: string; latest: Sample | null;
+  freshness: Freshness; stale_after_seconds?: number; server_time?: string; latest: Sample | null;
+  power_state: 'mains' | 'battery' | 'unknown';
+  battery_pct: number | null;
   active_alerts: number;
 };
 export type DevicePage = { items: Device[]; next_cursor?: string | null; server_time: string };
 export type AlertState = 'active' | 'acknowledged' | 'resolved';
 export type Severity = 'warning' | 'critical';
-export type AlertType = 'temperature_high' | 'temperature_low' | 'humidity_high' | 'humidity_low' | 'current_high' | 'telemetry_stale' | 'sensor_invalid';
+export type AlertType = 'temperature_high' | 'temperature_low' | 'humidity_high' | 'humidity_low' | 'current_high' | 'telemetry_stale' | 'sensor_invalid' | 'power_loss' | 'battery_low';
 export type Alert = {
   id: string; device_id: string; type: AlertType; severity: Severity; state?: AlertState;
   opened_at: string; acknowledged_at: string | null; acknowledged_by: string | null;
@@ -55,7 +57,7 @@ export function freshness(device: Device, elapsed = 0, serverTime = device.serve
   if (!device.latest) return 'unknown';
   if (!serverTime) return device.freshness;
   const age = Date.parse(serverTime) - Date.parse(device.latest.received_at) + elapsed;
-  return device.freshness === 'stale' || age > 15_000 ? 'stale' : 'fresh';
+  return device.freshness === 'stale' || age > (device.stale_after_seconds ?? 15) * 1000 ? 'stale' : 'fresh';
 }
 export function validateLimits(value: Limits): Record<string, string> {
   const errors: Record<string, string> = {};
@@ -73,4 +75,18 @@ export function validateLimits(value: Limits): Record<string, string> {
   if (!Number.isInteger(value.consecutive_samples) || value.consecutive_samples < 1) errors.consecutive_samples = 'Informe um inteiro positivo.';
   for (const [field, amount] of Object.entries(value)) if (amount !== null && !Number.isFinite(amount)) errors[field] = 'Informe um número válido.';
   return errors;
+}
+
+export type EnergyIncident = {
+  id: string;
+  type: 'power_loss';
+  status: 'open' | 'closed';
+  started_at: string;
+  ended_at: string | null;
+  duration_s: number | null;
+};
+export type IncidentPage = { items: EnergyIncident[]; next_cursor?: string | null };
+export function powerLabel(device: Device): string {
+  const state = device.power_state === 'battery' ? 'Em bateria' : device.power_state === 'mains' ? 'Rede elétrica' : 'Energia desconhecida';
+  return state + ' · Bateria ' + (device.battery_pct == null ? 'indisponível' : device.battery_pct + '%');
 }

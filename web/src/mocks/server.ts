@@ -2,6 +2,7 @@ import { ApiError, freshness, metricKeys, stateOf, validateLimits } from '../con
 import type { Alert, Bucket, Device, Limits, ReadingPoint, Role, Sample, Session, User } from '../contracts';
 
 export const scenarios = {
+  power: 'Queda de energia (em bateria)',
   normal: 'CPD operacional', critical: 'Temperatura crítica', stale: 'Telemetria antiga',
   invalid: 'Falha no DHT22', unknown: 'Dispositivo sem leitura', network: 'Falha de rede · HTTP 503',
   conflict: 'Conflito de versão · HTTP 409', empty: 'Sem dispositivos',
@@ -56,6 +57,7 @@ function alerts(): Alert[] {
   const resolved = { ...fixture('demo-resolved', 'humidity_low', 'warning', 'Umidade retornou à faixa operacional.', 'cpd-03'), resolved_at: iso(changedAt - 60_000) };
   const acknowledged = { ...fixture('demo-ack', 'current_high', 'warning', 'Corrente RMS acima do limite no rack de rede.', 'cpd-02'), acknowledged_at: iso(changedAt - 120_000), acknowledged_by: 'Operador CPD' };
   switch (scenario) {
+    case 'power': return [fixture('demo-power', 'power_loss', 'critical', 'POWER_LOSS / LAST_GASP recebido do dispositivo.'), fixture('demo-battery', 'battery_low', 'warning', 'Bateria baixa (18%).'), resolved];
     case 'critical': return [fixture('demo-critical', 'temperature_high', 'critical', 'Temperatura acima do limite de 27 °C.'), acknowledged, resolved];
     case 'stale': return [fixture('demo-stale', 'telemetry_stale', 'warning', 'Rack principal sem telemetria recente.'), resolved];
     case 'invalid': return [fixture('demo-invalid', 'sensor_invalid', 'warning', 'Sensor DHT22 retornou dados inválidos.'), resolved];
@@ -78,6 +80,8 @@ function devices(): Device[] {
     };
     const device: Device = {
       id, name, location, enabled: true, firmware_version: '0.2.0', server_time: iso(now),
+      power_state: primary && scenario === 'power' ? 'battery' : 'mains',
+      battery_pct: primary && scenario === 'power' ? 18 : null,
       stale_after_seconds: 15, latest, freshness: 'fresh',
       active_alerts: alerts().filter(alert => alert.device_id === id && stateOf(alert) !== 'resolved').length,
     };
@@ -164,11 +168,18 @@ export async function mockRequest({ path, method, body, token, signal }: MockReq
     acknowledgments.set(alert.id, audit);
     return { ...alert, ...audit };
   }
-  const [, deviceId, feature] = route.match(/^\/devices\/([^/]+)(?:\/(readings|limits))?$/) ?? [];
+  const [, deviceId, feature] = route.match(/^\/devices\/([^/]+)(?:\/(readings|limits|incidents))?$/) ?? [];
   const device = devices().find(item => item.id === decodeURIComponent(deviceId ?? ''));
   if (!device) throw new ApiError(404, 'Dispositivo não encontrado.');
   if (!feature) return device;
-  if (feature === 'readings') return history(device, query);
+  if (feature === 'incidents' && method === 'GET') {
+      const items = scenario === 'power' && device.id === 'cpd-01' ? [
+        { id: 'power-open', type: 'power_loss', status: 'open', started_at: iso(changedAt - 180_000), ended_at: null, duration_s: null },
+        { id: 'power-closed', type: 'power_loss', status: 'closed', started_at: iso(changedAt - 86400_000), ended_at: iso(changedAt - 85800_000), duration_s: 600 },
+      ] : [];
+      return page(items, query.get('cursor'), 50);
+    }
+    if (feature === 'readings') return history(device, query);
   if (user.role !== 'admin') throw new ApiError(403, 'Apenas administradores podem acessar os limites.');
   const current = limits.get(device.id) ?? baseLimits;
   if (method === 'GET') return current;

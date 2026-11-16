@@ -1,3 +1,4 @@
+import { powerLabel } from '../types';
 import React from 'react';
 import { Pressable, Text, View } from 'react-native';
 import {
@@ -60,7 +61,8 @@ export function RackCard({
         <StatusBadge value={device.freshness} />
       </View>
 
-      <View className="flex-row bg-slate-50 border border-slate-200/80 rounded-xl p-2.5 my-1">
+      <Text className="font-bold text-amber-800 bg-amber-50 p-3">{powerLabel(device)}</Text>
+<View className="flex-row bg-slate-50 border border-slate-200/80 rounded-xl p-2.5 my-1">
         {metricKeys.map((metric, idx) => {
           const Icon = metricIcons[metric];
           const iconColor =

@@ -48,3 +48,17 @@ O exemplo anexado não fixa a estrutura JSON de cada ponto de histórico. O clie
 - `tests` — regressões de telemetria, RBAC, versionamento, paginação e sessão.
 
 O site publicado usa exclusivamente dados fictícios. Reconhecimentos e ajustes no mock duram enquanto a página permanece aberta.
+
+## Energia e API v2
+
+Device inclui power_state (mains, battery ou unknown) e battery_pct (número ou null). Bateria indisponível permanece sem percentual. A demonstração Queda de energia (em bateria) apresenta POWER_LOSS/LAST_GASP, alerta power_loss crítico, battery_low de aviso e incidentes aberto e encerrado.
+
+GET /devices/{id}/incidents retorna items e next_cursor. Cada incidente contém id, type (power_loss), status (open/closed), started_at, ended_at (ou null) e duration_s (ou null). O detalhe percorre os cursores e mostra início, fim e duração. O backend abre power_loss a partir do evento explícito do dispositivo. Corrente zero isolada não confirma queda.
+
+O prazo de telemetria usa stale_after_seconds do servidor, com padrão de 15 segundos quando ausente. Limites são regras de alerta no servidor, sem envio ao ESP32 nesta versão.
+
+Configure VITE_API_BASE=http://192.168.0.10:8000/api/v2 no .env.local.
+
+Use o IP do computador que executa a API, acessível na mesma rede do celular. O servidor deve escutar na interface de rede e permitir a origem web por CORS. Uma página HTTPS precisa de API HTTPS ou proxy na mesma origem.
+
+Mocks só são ativados explicitamente por VITE_USE_MOCKS=true. Para API real, use false ou remova a variável e reinicie/recompile a aplicação. No celular, localhost aponta para o próprio celular.
