@@ -14,7 +14,6 @@ jobs:
         working-directory: mobile
     env:
       CI: "1"
-      EXPO_PUBLIC_USE_MOCKS: "true"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -41,9 +40,13 @@ jobs:
         run: npm test
       - name: Compile web bundle in demo mode
         if: ${{ !cancelled() }}
+        env:
+          EXPO_PUBLIC_USE_MOCKS: "true"
         run: npx expo export --platform web
       - name: Compile iOS bundle in demo mode
         if: ${{ !cancelled() }}
+        env:
+          EXPO_PUBLIC_USE_MOCKS: "true"
         run: npx expo export --platform ios
   web:
     runs-on: ubuntu-latest
