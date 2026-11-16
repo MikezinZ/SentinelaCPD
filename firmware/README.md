@@ -1,4 +1,8 @@
-# Atualização em preparação: OTA e energia\n\nA revisão OTA está descrita em [OTA_E_ENERGIA.md](OTA_E_ENERGIA.md). Ela adiciona código, perfil de bootloader com rollback e monitoramento opcional da alimentação. OTA vem desabilitado e requer ligação de presença de fonte, HTTPS/chaves, bootloader correspondente e teste físico. A tabela de partições nova exige planejamento da primeira gravação USB. As instruções abaixo registram a etapa anterior de conectividade e seus testes.\n\n# Firmware — etapa 1: operação autônoma e configuração de Wi-Fi
+# Atualização em preparação: OTA e energia
+
+A revisão OTA está descrita em [OTA_E_ENERGIA.md](OTA_E_ENERGIA.md). Ela adiciona código, perfil de bootloader com rollback e monitoramento opcional da alimentação. OTA vem desabilitado e requer ligação de presença de fonte, HTTPS/chaves, bootloader correspondente e teste físico. A tabela de partições nova exige planejamento da primeira gravação USB. As instruções abaixo registram a etapa anterior de conectividade e seus testes.
+
+# Firmware — etapa 1: operação autônoma e configuração de Wi-Fi
 
 Proposta para teste na placa ESP32-WROOM-32 dual-core. Base: firmware N1 do repositório, blob `11ff8f13e42eefe8d82ea738af5099ec9532ffa9`.
 
@@ -45,15 +49,20 @@ Obter IP NÃO comprova acesso à internet, DNS, broker ou banco. O MVP atende Wi
 - Senha de portal esquecida exige manutenção USB para regravar `config.h`; não há senha universal de recuperação.
 - Credenciais são salvas como um único registro NVS versionado. Não são criptografadas contra leitura física da flash nesta etapa. As rotas HTTP recusam acesso pela interface da rede do CPD e exigem conexão à rede temporária; o formulário usa token de sessão. Não imprimir senhas ou devolvê-las em páginas.
 
-## Compatibilidade com N1 e aplicativo
+## Integração com o Cloud (MQTT)
 
-Tópico configurável, padrão `esp32/telemetria`; payload preservado:
+O tópico é montado com o ID fixo da placa. `{id}` em `MQTT_TOPIC` e `MQTT_EVENT_TOPIC` vira `ESP32_CPD_<MAC>`:
 
-```json
-{"temperatura": 24.3, "umidade": 57.1, "corrente": 0.08}
-```
+| Tópico (padrão) | Quando | Payload |
+| --- | --- | --- |
+| `sentinela/{id}/telemetria` | a cada amostra (5 s) | `{"temperatura":24.3,"umidade":57.1,"corrente":0.08,"bateria":87,"rede":true}` |
+| `sentinela/{id}/evento` | queda e retorno da fonte externa | `{"evento":"POWER_LOSS","estado":"ON_BATTERY","temperatura":29.4,"umidade":58.2,"bateria":87}` e `{"evento":"POWER_RESTORED",...}` |
 
-Não há migração de banco ou contrato MQTT v2 neste incremento. `cliente_id` no banco passará a refletir o ID fixo se a regra atual usa o clientid do broker. Verifique autenticação/ACL caso esteja vinculada aos IDs antigos; não abra permissões indiscriminadamente. O histórico com IDs aleatórios não é renomeado.
+- `bateria` é a estimativa linear da 18650 (3,30 V = 0 %, 4,20 V = 100 %) e `rede` é o estado filtrado da fonte (PC817). Os dois saem `null` enquanto `BATTERY_ADC_PIN` e `POWER_PRESENT_PIN` estiverem em `-1`.
+- Os eventos só existem com `POWER_PRESENT_PIN` configurado. Ligar a placa já sem fonte gera `POWER_LOSS`. Eventos ocorridos sem conexão ficam numa fila de 4 e são enviados em ordem na reconexão, antes da telemetria.
+- O ingestor do Cloud usa o ID do tópico para separar os dispositivos, abre o incidente de energia no `POWER_LOSS` e fecha no `POWER_RESTORED`, calculando a duração.
+- Um `config.h` antigo com `MQTT_TOPIC "esp32/telemetria"` continua compilando, mas o Cloud grava tudo como `ESP32_CPD_01`. Atualize o `config.h` pelo `config.example.h`.
+- A lógica de tópico, bateria, eventos e JSON fica em `TelemetryContract.h`, sem dependência do Arduino, e tem teste próprio.
 
 Se DHT falhar, a coleta e o diagnóstico da corrente continuam, mas a mensagem MQTT completa é omitida para não enviar `null` ao SQL legado. A publicação independente por métrica fica para o contrato v2. Corrente zero não comprova ausência de tensão.
 
@@ -86,6 +95,8 @@ O teste C++ exercita validação de credenciais, registro NVS malformado, overfl
 ```sh
 g++ -std=c++11 -Wall -Wextra -Werror tests/firmware/runtime_policy_test.cpp -o /tmp/sentinela-test
 /tmp/sentinela-test
+g++ -std=c++11 -Wall -Wextra -Werror tests/firmware/telemetry_contract_test.cpp -o /tmp/sentinela-contrato
+/tmp/sentinela-contrato
 ```
 
 Rode a partir da raiz do repositório. O teste não simula rádio, armazenamento NVS, DHCP, HTTP nem sensores físicos. Compilação para ESP32 e teste em bancada são verificações distintas.

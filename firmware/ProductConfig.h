@@ -21,6 +21,9 @@
 #ifndef OTA_PUBLIC_KEY_PEM
 #define OTA_PUBLIC_KEY_PEM ""
 #endif
+#ifndef MQTT_EVENT_TOPIC
+#define MQTT_EVENT_TOPIC "sentinela/{id}/evento"
+#endif
 #ifndef POWER_PRESENT_PIN
 #define POWER_PRESENT_PIN -1
 #endif

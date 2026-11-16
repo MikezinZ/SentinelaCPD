@@ -11,6 +11,7 @@
 #include "config.h"
 #include "PowerMonitor.h"
 #include "SecureOta.h"
+#include "TelemetryContract.h"
 
 #ifndef CONFIG_AP_PASSWORD
 #error "Atualize config.h pelo config.example.h: configure CONFIG_AP_PASSWORD."
@@ -47,6 +48,9 @@ bool connectionSeen = false, closeScheduled = false;
 uint32_t portalAt = 0, candidateAt = 0, wifiAttemptAt = 0;
 uint32_t offlineAt = 0, closeAt = 0, publishedSeq = 0;
 char deviceId[24], apName[32], csrf[33];
+char telemetryTopic[96], eventTopic[96];
+PowerEventDetector powerDetector;
+PowerEventQueue powerEvents;
 String notice = "Informe o nome exato da rede Wi-Fi e a senha.";
 
 // Coleta em tarefa própria: timeouts de HTTP/MQTT não interrompem a aquisição.
@@ -280,6 +284,16 @@ void serviceMqtt() {
 #if MQTT_TLS_ENABLED
   if(strlen(MQTT_CA_PEM)<50 || !strlen(MQTT_USER) || !strlen(MQTT_PASS) || time(nullptr)<=1767225600)return;
 #endif
+  Sample sample{};
+  const bool haveSample = latestQueue && xQueuePeek(latestQueue, &sample, 0) == pdTRUE;
+  // Detecta queda/retorno da fonte mesmo sem rede; os eventos ficam na fila até reconectar.
+  if (haveSample) {
+    const PowerEvent event = powerDetector.update(sample.externalPower);
+    if (event != POWER_NONE) {
+      powerEvents.push(event);
+      Serial.printf("[ENERGIA] %s\n", powerEventName(event));
+    }
+  }
   // Durante o portal, priorizar a configuração; coleta continua na outra tarefa.
   if (portalActive || candidatePending || WiFi.status() != WL_CONNECTED || !strlen(MQTT_BROKER)) return;
   if (!mqtt.connected()) {
@@ -294,21 +308,33 @@ void serviceMqtt() {
     Serial.printf("[MQTT] Conectado: %s\n", deviceId);
   }
   mqtt.loop();
-  Sample sample{};
-  if (!latestQueue || xQueuePeek(latestQueue, &sample, 0) != pdTRUE ||
-      sample.seq == publishedSeq || elapsed(millis(), sample.at, SAMPLE_MS * 2)) return;
+  const int battery = haveSample ? batteryPercent(sample.batteryVolts) : -1;
+  while (!powerEvents.empty()) {
+    char eventPayload[160];
+    const int size = buildPowerEvent(eventPayload, sizeof(eventPayload), powerEvents.front(),
+      haveSample ? sample.temperature : NAN, haveSample ? sample.humidity : NAN, battery);
+    if (size <= 0 || size_t(size) >= sizeof(eventPayload)) { powerEvents.pop(); continue; }
+    if (!mqtt.publish(eventTopic, eventPayload, false)) {
+      Serial.println("[MQTT] Evento de energia nao enviado; nova tentativa na reconexao.");
+      transport.stop();
+      mqttRetry.failed(millis());
+      return;
+    }
+    Serial.printf("[MQTT] Evento enviado: %s\n", eventPayload);
+    powerEvents.pop();
+  }
+  if (!haveSample || sample.seq == publishedSeq || elapsed(millis(), sample.at, SAMPLE_MS * 2)) return;
   // Preservar contrato N1: não enviar null para SQL legado. Falha DHT não para a coleta de corrente.
   if (!isfinite(sample.temperature) || !isfinite(sample.humidity) || !isfinite(sample.current)) {
     publishedSeq = sample.seq;
     Serial.println("[MQTT] Amostra invalida; envio legado omitido."); return;
   }
   char payload[160];
-  const int count = snprintf(payload, sizeof(payload),
-    "{\"temperatura\": %.1f, \"umidade\": %.1f, \"corrente\": %.2f}",
-    sample.temperature, sample.humidity, sample.current);
+  const int count = buildTelemetry(payload, sizeof(payload), sample.temperature, sample.humidity,
+    sample.current, battery, sample.externalPower);
   if (count > 0 && size_t(count) < sizeof(payload)) {
     publishedSeq = sample.seq; // QoS 0; sem ACK de banco ou replay nesta etapa
-    if (!mqtt.publish(MQTT_TOPIC, payload, false)) {
+    if (!mqtt.publish(telemetryTopic, payload, false)) {
       Serial.println("[MQTT] Publicacao falhou; sem historico offline nesta etapa.");
       transport.stop();
       mqttRetry.failed(millis());
@@ -323,7 +349,13 @@ void setup() {
     unsigned((mac >> 32) & 0xffff), unsigned(mac & 0xffffffff));
   snprintf(apName, sizeof(apName), "SentinelaCPD-%04X%08X",
     unsigned((mac >> 32) & 0xffff), unsigned(mac & 0xffffffff));
-  Serial.printf("\n[BOOT] firmware etapa1 | ID %s\n", deviceId);
+  if (!expandTopic(MQTT_TOPIC, deviceId, telemetryTopic, sizeof(telemetryTopic)) ||
+      !expandTopic(MQTT_EVENT_TOPIC, deviceId, eventTopic, sizeof(eventTopic))) {
+    Serial.println("[ERRO] Topico MQTT longo demais; usando padrao.");
+    expandTopic("sentinela/{id}/telemetria", deviceId, telemetryTopic, sizeof(telemetryTopic));
+    expandTopic("sentinela/{id}/evento", deviceId, eventTopic, sizeof(eventTopic));
+  }
+  Serial.printf("\n[BOOT] firmware etapa1 | ID %s | topicos %s e %s\n", deviceId, telemetryTopic, eventTopic);
   secureOta::begin();
   latestQueue = xQueueCreate(1, sizeof(Sample));
   if (!latestQueue || xTaskCreatePinnedToCore(sampleTask, "sensors", 4096, nullptr, 1, nullptr, 1) != pdPASS) {

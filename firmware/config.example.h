@@ -14,7 +14,9 @@
 #define MQTT_PORT   1883
 #define MQTT_USER   ""
 #define MQTT_PASS   ""
-#define MQTT_TOPIC  "esp32/telemetria"
+// {id} vira o ID fixo da placa (ESP32_CPD_<MAC>). O Cloud identifica o dispositivo pelo tópico.
+#define MQTT_TOPIC        "sentinela/{id}/telemetria"
+#define MQTT_EVENT_TOPIC  "sentinela/{id}/evento"   // POWER_LOSS / POWER_RESTORED
 
 // --- Calibração dos Sensores ---
 // Mantenha o fator já usado na bancada. Este é apenas o exemplo da N1.
