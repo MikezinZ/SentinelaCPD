@@ -148,9 +148,25 @@ export function DeviceDetailScreen() {
               </Banner>
             ) : null}
 
-            <Text className="font-bold text-amber-800 bg-amber-50 p-3">{powerLabel(device)}</Text>
-<EnergyIncidents id={deviceId}/>
-{/* Metadados do Nó: Status, Timestamp Exato e Firmware */}
+            <View
+              className={`rounded-xl px-3.5 py-2.5 mb-3 border ${
+                device.power_state === 'battery'
+                  ? 'bg-amber-50 border-amber-300'
+                  : 'bg-white border-slate-200'
+              }`}
+            >
+              <Text
+                className={`text-xs font-bold ${
+                  device.power_state === 'battery'
+                    ? 'text-amber-900'
+                    : 'text-slate-700'
+                }`}
+              >
+                {powerLabel(device)}
+              </Text>
+            </View>
+            <EnergyIncidents id={deviceId} />
+            {/* Metadados do Nó: Status, Timestamp Exato e Firmware */}
             <Card className="mb-4">
               <View className="flex-row items-center justify-between pb-3 border-b border-slate-100">
                 <View className="flex-row items-center gap-2">

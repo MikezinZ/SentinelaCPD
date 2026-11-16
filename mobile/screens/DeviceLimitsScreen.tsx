@@ -367,7 +367,6 @@ export function DeviceLimitsScreen() {
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ padding: 16, paddingBottom: 110 }}
         >
-<Text>Os limites são aplicados pelo servidor para gerar alertas. Não são enviados ao ESP32 nesta versão.</Text>
           <View className="mb-4">
             <Text className="text-2xl font-extrabold text-slate-900 tracking-tight">
               Configuração de Limites
@@ -376,6 +375,10 @@ export function DeviceLimitsScreen() {
               {deviceResult.data?.name ?? deviceId} · Parametrização exclusiva Admin
             </Text>
           </View>
+
+          <Banner title="Avaliação no Servidor" tone="blue">
+            Os limites são aplicados pelo servidor para gerar alertas. Não são enviados ao ESP32 nesta versão.
+          </Banner>
 
           {user?.role !== 'admin' ? (
             <Banner title="Acesso Restrito (RBAC)" tone="red">

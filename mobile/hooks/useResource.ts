@@ -46,7 +46,7 @@ export function useResource<T>(
     let failures = 0;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let controller: AbortController | undefined;
-    let currentAppState: AppStateStatus = AppState.currentState;
+    let currentAppState: AppStateStatus = (AppState.currentState ?? 'active') as AppStateStatus;
 
     async function execute() {
       if (disposed || pending) return;
