@@ -22,10 +22,10 @@ const baseLimits: Limits = {
   current_max: 12, consecutive_samples: 3, temperature_hysteresis: 1, humidity_hysteresis: 3, current_hysteresis: 0.5,
 };
 const racks = [
-  ['cpd-01', 'Rack principal', 'Sala CPD · Setor A', 24.3, 48.6, 4.82],
-  ['cpd-02', 'Rack de rede', 'Sala CPD · Setor B', 23.8, 51.2, 2.65],
-  ['cpd-03', 'Rack de armazenamento', 'Sala CPD · Setor C', 25.1, 46.8, 6.14],
-  ['cpd-04', 'Rack de contingência', 'Sala técnica · Setor D', 22.6, 50.4, 0.08],
+  ['cpd-01', 'Rack principal', 'Sala CPD · Setor A', 24.3, 48.6, 0.10],
+  ['cpd-02', 'Rack de rede', 'Sala CPD · Setor B', 23.8, 51.2, 0.11],
+  ['cpd-03', 'Rack de armazenamento', 'Sala CPD · Setor C', 25.1, 46.8, 0.12],
+  ['cpd-04', 'Rack de contingência', 'Sala técnica · Setor D', 22.6, 50.4, 0.09],
 ] as const;
 const iso = (time: number) => new Date(time).toISOString();
 const bucketMs: Record<Bucket, number> = { raw: 5000, '1m': 60_000, '15m': 900_000 };
@@ -108,8 +108,8 @@ function history(device: Device, query: URLSearchParams) {
         if (device.latest?.quality[metric] === 'invalid' && index > 0.8 * (to - from) / step) return;
         const base = rack[n + 3] as number;
         const peak = device.id === 'cpd-01' && scenario === 'critical' && metric === 'temperature' && t > to - (to - from) * 0.1 ? 6 : 0;
-        const avg = Math.max(0, base + Math.sin(index * 0.035) * (n === 2 ? 0.06 : 1.1) + Math.cos(index * 0.19) * (n === 2 ? 0.015 : 0.32) + peak);
-        const spread = bucket === 'raw' ? 0 : n === 2 ? 0.04 : 0.5 + Math.abs(Math.sin(index)) * 0.5;
+        const avg = Math.max(0, base + Math.sin(index * 0.035) * (n === 2 ? 0.003 : 1.1) + Math.cos(index * 0.19) * (n === 2 ? 0.002 : 0.32) + peak);
+        const spread = bucket === 'raw' ? 0 : n === 2 ? 0.004 : 0.5 + Math.abs(Math.sin(index)) * 0.5;
         point[metric] = { avg, min: Math.max(0, avg - spread), max: avg + spread, count: step / 5000 };
       });
       points.push(point);

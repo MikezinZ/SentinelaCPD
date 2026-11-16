@@ -20,7 +20,7 @@ test('telemetria mantém nulos, qualidade independente e limite de 15 segundos',
   const invalid = await api.device('cpd-01');
   assert.equal(reading(invalid.latest, 'temperature'), null);
   assert.equal(reading(invalid.latest, 'humidity'), null);
-  assert.equal(reading(invalid.latest, 'current'), 4.82);
+  assert.equal(reading(invalid.latest, 'current'), 0.10);
   assert.equal(freshness(invalid, 15_000, invalid.latest?.received_at), 'fresh');
   assert.equal(freshness(invalid, 15_001, invalid.latest?.received_at), 'stale');
   setScenario('stale');

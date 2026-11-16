@@ -60,7 +60,7 @@ test('1. Telemetria mantém nulos, qualidade independente por sensor e limite de
   const invalidDevice = await client.device('cpd-01');
   assert.equal(reading(invalidDevice.latest, 'temperature'), null);
   assert.equal(reading(invalidDevice.latest, 'humidity'), null);
-  assert.equal(reading(invalidDevice.latest, 'current'), 4.82);
+  assert.equal(reading(invalidDevice.latest, 'current'), 0.10);
 
   // Limite exato de 15 segundos
   assert.equal(

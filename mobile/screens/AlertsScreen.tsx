@@ -49,15 +49,15 @@ import {
 
 const STATE_OPTIONS: readonly { id: AlertState | ''; label: string }[] = [
   { id: '', label: 'Todos estados' },
-  { id: 'active', label: 'Ativo (active)' },
-  { id: 'acknowledged', label: 'Reconhecido (acknowledged)' },
-  { id: 'resolved', label: 'Resolvido (resolved)' },
+  { id: 'active', label: 'Ativo' },
+  { id: 'acknowledged', label: 'Reconhecido' },
+  { id: 'resolved', label: 'Resolvido' },
 ];
 
 const SEVERITY_OPTIONS: readonly { id: Severity | ''; label: string }[] = [
   { id: '', label: 'Todas severidades' },
-  { id: 'critical', label: 'Crítico (critical)' },
-  { id: 'warning', label: 'Atenção (warning)' },
+  { id: 'critical', label: 'Crítico' },
+  { id: 'warning', label: 'Atenção' },
 ];
 
 const stateLabels: Record<AlertState, string> = {
@@ -349,7 +349,7 @@ export function AlertsScreen() {
                 </View>
 
                 <Text className="text-[11px] font-semibold text-slate-400">
-                  Regra v{alert.rule_version}
+                  Limites v{alert.rule_version}
                 </Text>
               </View>
 

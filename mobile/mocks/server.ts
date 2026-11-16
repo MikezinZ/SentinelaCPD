@@ -72,10 +72,10 @@ const baseLimits: Limits = {
 };
 
 const racks = [
-  ['cpd-01', 'Rack Principal', 'Sala CPD · Setor A', 24.3, 48.6, 4.82, true],
-  ['cpd-02', 'Rack de Rede', 'Sala CPD · Setor B', 23.8, 51.2, 2.65, true],
-  ['cpd-03', 'Rack de Armazenamento', 'Sala CPD · Setor C', 25.1, 46.8, 6.14, true],
-  ['cpd-04', 'Rack de Contingência', 'Sala Técnica · Setor D', 22.6, 50.4, 0.08, true],
+  ['cpd-01', 'Rack Principal', 'Sala CPD · Setor A', 24.3, 48.6, 0.10, true],
+  ['cpd-02', 'Rack de Rede', 'Sala CPD · Setor B', 23.8, 51.2, 0.11, true],
+  ['cpd-03', 'Rack de Armazenamento', 'Sala CPD · Setor C', 25.1, 46.8, 0.12, true],
+  ['cpd-04', 'Rack de Contingência', 'Sala Técnica · Setor D', 22.6, 50.4, 0.09, true],
 ] as const;
 
 const iso = (time: number) => new Date(time).toISOString();
@@ -367,15 +367,15 @@ function buildHistory(device: Device, query: Record<string, string | undefined>)
         const avg = Math.max(
           0,
           base +
-            Math.sin(index * 0.08) * (n === 2 ? 0.06 : 1.15) +
-            Math.cos(index * 0.21) * (n === 2 ? 0.02 : 0.35) +
+            Math.sin(index * 0.08) * (n === 2 ? 0.003 : 1.15) +
+            Math.cos(index * 0.21) * (n === 2 ? 0.002 : 0.35) +
             peak
         );
         const spread =
           bucket === 'raw'
             ? 0
             : n === 2
-              ? 0.05 + Math.abs(Math.sin(index * 0.3)) * 0.08
+              ? 0.002 + Math.abs(Math.sin(index * 0.3)) * 0.002
               : 0.6 + Math.abs(Math.sin(index * 0.25)) * 0.85;
 
         point[metric] = {

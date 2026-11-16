@@ -57,20 +57,10 @@ export function DemoFloatingMenu() {
           accessibilityRole="button"
           accessibilityLabel={`Abrir Modo Demonstração. Cenário atual: ${scenarios[scenario]}`}
           style={{ minHeight: 48, minWidth: 48 }}
-          className="flex-row items-center gap-2 px-4 py-3 rounded-full bg-slate-900 border border-blue-400/40 shadow-lg active:opacity-90"
+          className="flex-row items-center gap-2 px-3 py-2 rounded-full bg-slate-900 border border-blue-400/40 shadow-lg active:opacity-90"
         >
           <FlaskConical size={18} color="#60a5fa" />
-          <View>
-            <Text className="text-[10px] font-bold uppercase tracking-wider text-blue-300">
-              Modo Demo
-            </Text>
-            <Text
-              numberOfLines={1}
-              className="text-xs font-bold text-white max-w-[150px]"
-            >
-              {scenarios[scenario].replace(/^\d+\.\s*/, '')}
-            </Text>
-          </View>
+          <Text className="text-xs font-bold text-white">Demo</Text>
         </Pressable>
       </View>
 
@@ -89,10 +79,10 @@ export function DemoFloatingMenu() {
                 </View>
                 <View className="flex-1">
                   <Text className="text-base font-extrabold text-slate-900">
-                    Modo Demonstração (Mocks)
+                    Modo Demonstração
                   </Text>
                   <Text className="text-xs text-slate-500">
-                    Alterne em tempo real entre os 7 cenários obrigatórios e perfis RBAC
+                    Escolha um cenário de demonstração e um perfil de acesso
                   </Text>
                 </View>
               </View>
