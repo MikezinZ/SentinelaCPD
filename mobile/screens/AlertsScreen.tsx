@@ -465,7 +465,7 @@ export function AlertsScreen() {
                 />
               </View>
             </Card>
-          ) : null
+          ) : undefined
         }
       />
 

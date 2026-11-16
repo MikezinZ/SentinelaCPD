@@ -61,8 +61,24 @@ export function RackCard({
         <StatusBadge value={device.freshness} />
       </View>
 
-      <Text className="font-bold text-amber-800 bg-amber-50 p-3">{powerLabel(device)}</Text>
-<View className="flex-row bg-slate-50 border border-slate-200/80 rounded-xl p-2.5 my-1">
+      <View
+        className={`rounded-xl px-3 py-2 mb-2 border ${
+          device.power_state === 'battery'
+            ? 'bg-amber-50 border-amber-300'
+            : 'bg-slate-50 border-slate-200'
+        }`}
+      >
+        <Text
+          className={`text-xs font-bold ${
+            device.power_state === 'battery'
+              ? 'text-amber-900'
+              : 'text-slate-700'
+          }`}
+        >
+          {powerLabel(device)}
+        </Text>
+      </View>
+      <View className="flex-row bg-slate-50 border border-slate-200/80 rounded-xl p-2.5 my-1">
         {metricKeys.map((metric, idx) => {
           const Icon = metricIcons[metric];
           const iconColor =

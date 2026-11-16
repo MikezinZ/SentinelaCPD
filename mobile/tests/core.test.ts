@@ -4,6 +4,7 @@ import {
   ApiError,
   buildChartPoints,
   freshness,
+  powerLabel,
   reading,
   stateOf,
 } from '../types/index.ts';
@@ -16,6 +17,8 @@ import {
 import {
   REFRESH_TOKEN_KEY,
   createApi,
+  defaultTransport,
+  useMocks,
   type SecureStorageLike,
   type Transport,
 } from '../services/api.ts';
@@ -265,5 +268,39 @@ test('energia explícita e freshness configurável', async () => {
     assert.equal(freshness({...device, stale_after_seconds: 30}, 30000, server), 'fresh');
     assert.equal(freshness({...device, stale_after_seconds: 30}, 30001, server), 'stale');
     assert.equal(freshness({...device, stale_after_seconds: undefined}, 15001, server), 'stale');
+
+    // Corrente zero isolada não é interpretada como queda de energia
+    const zeroCurrentDevice = {
+      ...device,
+      power_state: 'mains' as const,
+      battery_pct: null,
+      latest: { ...device.latest!, current_rms_a: 0 },
+    };
+    assert.equal(reading(zeroCurrentDevice.latest, 'current'), 0);
+    assert.equal(powerLabel(zeroCurrentDevice), 'Rede elétrica · Bateria indisponível');
+
+    // Paginação por cursor em GET /devices/{id}/incidents
+    let incidentCalls = 0;
+    const pagedClient = createApi(async <T>(path: string, method: string, body: unknown, token: string | null, signal: AbortSignal) => {
+      if (path.startsWith('/devices/cpd-01/incidents')) {
+        incidentCalls++;
+        if (!path.includes('cursor=')) {
+          return { items: [incidents[0]], next_cursor: 'cursor_1' } as T;
+        }
+        return { items: [incidents[1]], next_cursor: null } as T;
+      }
+      return mockTransport<T>(path, method, body, token, signal);
+    }, createTestStorage());
+    await pagedClient.login(demoEmail('viewer'), demoPassword);
+    const pagedIncidents = await pagedClient.incidents('cpd-01');
+    assert.equal(incidentCalls, 2);
+    assert.equal(pagedIncidents.length, 2);
+
+    // Sem EXPO_PUBLIC_USE_MOCKS=true definido no ambiente Node, useMocks é false e defaultTransport exige URL válida
+    assert.equal(useMocks, false);
+    await assert.rejects(
+      defaultTransport('/devices', 'GET', undefined, null, new AbortController().signal),
+      (err: ApiError) => err.status === 0 && err.message.includes('EXPO_PUBLIC_API_BASE')
+    );
   } finally { setScenario('normal'); }
 });

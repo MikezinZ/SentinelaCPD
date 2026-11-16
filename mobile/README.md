@@ -2,7 +2,7 @@
 
 Aplicativo móvel de campo para monitoramento de telemetria em tempo real (temperatura, umidade relativa e corrente eficaz $I_{\text{RMS}}$) de nós ESP32 em racks de CPD e auditoria rápida de incidentes na ponta.
 
-Construído com **React Native**, **Expo (SDK 54)**, **Expo Router**, **TypeScript**, **NativeWind v4 (Tailwind CSS)**, **Expo SecureStore**, **Lucide React Native** e **React Native SVG / Gifted Charts**.
+Construído com **React Native**, **Expo (SDK 58)**, **Expo Router**, **TypeScript**, **NativeWind v4 (Tailwind CSS)**, **Expo SecureStore**, **Lucide React Native** e **React Native SVG / Gifted Charts**.
 
 ---
 
@@ -38,7 +38,7 @@ Após autenticar, utilize o botão flutuante **Modo Demo** no canto inferior dir
 1. **CPD Operacional Normal:** Todos os sensores `ok` e pacotes recentes (`fresh` $\le 15\text{ s}$).
 2. **Alerta Ativo de Temperatura Crítica:** Temperatura em $30,8\ ^\circ\text{C}$ ($> 27\ ^\circ\text{C}$) com alerta crítico aberto.
 3. **Telemetria Antiga (`stale`):** Mais de $15\text{ s}$ sem leitura, exibindo banner fixo *"Dados armazenados — conexão indisponível"* com o timestamp original preservado.
-4. **Falha de Sensor (`invalid`):** Sensor DHT22 inválido (`Indisponível`), mantendo a leitura de Corrente RMS (`4,82 A`) íntegra e independente.
+4. **Falha de Sensor (`invalid`):** Sensor DHT22 inválido (`Indisponível`), mantendo a leitura de Corrente RMS (`0,10 A`) íntegra e independente.
 5. **Dispositivo Novo sem leitura (`unknown`):** Nó recém-cadastrado com `latest: null` e leituras como `Indisponível`.
 6. **Falha de Rede (HTTP 503):** Simula erro de comunicação mantendo dados previamente carregados com aviso de cache.
 7. **Conflito de Versão nos Limites (HTTP 409):** Simula concorrência otimista na tela `/devices/:id/limits`, disparando `Alert` nativo e exigindo recarregamento antes de salvar.
