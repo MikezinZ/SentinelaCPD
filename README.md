@@ -484,7 +484,8 @@ flowchart LR
     ING --> DB[("MySQL 8.0")]
     DB --> API["API REST (FastAPI :8000)"]
     DB --> NOT["Notifier (Python)"]
-    API -->|"JSON / X-API-Key"| APP["App Mobile / Web"]
+    ING -->|"regras e limites"| DB
+    API -->|"/api/v2 · JWT"| APP["App Mobile / Web"]
     NOT -->|"Bot API"| TG["Telegram"]
 ```
 
@@ -492,8 +493,8 @@ flowchart LR
 | --- | --- | --- |
 | `emqx` | `emqx/emqx:5.8.0` | Broker MQTT (1883), dashboard (18083) e WebSocket (8083) |
 | `mysql` | `mysql:8.0` | Persistência; schema criado por `db/init.sql` |
-| `ingestor` | Python + `paho-mqtt` | Assina os tópicos, valida faixas, grava leituras e abre/fecha incidentes |
-| `api` | FastAPI + Uvicorn | Endpoints REST para o aplicativo, com CORS e `X-API-Key` opcional |
+| `ingestor` | Python + `paho-mqtt` | Assina os tópicos, valida faixas, grava leituras, abre/fecha incidentes e roda o motor de alertas |
+| `api` | FastAPI + Uvicorn | API v2 do app e do dashboard (login, perfis, alertas, limites) e rotas v1 simples |
 | `notifier` | Python (`urllib`) | Consulta o banco a cada 5 s e envia alertas ao Telegram |
 
 > Na N1 a gravação era feita por Data Bridge e regra SQL do EMQX. Na Cloud, a ingestão passou para um serviço próprio (`ingestor`), porque o Data Bridge não expressa a lógica de **incidentes** (abrir, fechar e calcular duração) nem valida os dados. O tópico legado `esp32/telemetria` continua aceito e é gravado como `ESP32_CPD_01`.
@@ -502,7 +503,7 @@ flowchart LR
 
 | Tópico | Payload |
 | --- | --- |
-| `sentinela/<id>/telemetria` | `{"temperatura":27.8,"umidade":45.4,"corrente":0.8,"bateria":87}` (campos opcionais) |
+| `sentinela/<id>/telemetria` | `{"temperatura":27.8,"umidade":45.4,"corrente":0.8,"bateria":87,"rede":true}` (campos opcionais; `rede` é a fonte externa lida pelo PC817) |
 | `sentinela/<id>/evento` | `{"evento":"POWER_LOSS","estado":"ON_BATTERY","temperatura":29.4,"umidade":58.2,"bateria":87}` |
 | `esp32/telemetria` | legado da N1, sem id |
 
@@ -512,26 +513,53 @@ Eventos válidos: `POWER_LOSS`, `LAST_GASP` e `POWER_RESTORED`. `POWER_LOSS` e `
 
 | Tabela | Conteúdo |
 | --- | --- |
-| `dispositivos` | id, nome, local, estado, criado_em, ultimo_contato |
+| `dispositivos` | id, nome, local, estado, energia (`mains`/`battery`/`unknown`), ativo, firmware, criado_em, ultimo_contato |
 | `leituras` | dispositivo_id, temperatura, umidade, corrente, bateria, data_hora |
 | `eventos` | dispositivo_id, tipo, payload (JSON), data_hora |
 | `incidentes` | dispositivo_id, tipo (`QUEDA_ENERGIA`), status (`ABERTO`/`FECHADO`), inicio, fim, duracao_s |
-| `notificacoes` | controle de alertas já enviados, para não repetir (chave única `tipo` + `referencia_id`) |
+| `alertas` | tipo, severidade, mensagem, aberto/reconhecido/resolvido, quem reconheceu e nota |
+| `limites` | faixas de temperatura, umidade e corrente por dispositivo, histerese, amostras seguidas e versão |
+| `usuarios` / `sessoes` | contas com perfil (`viewer`, `operator`, `admin`) e tokens de renovação |
+| `notificacoes` | controle de alertas já enviados ao Telegram, para não repetir (chave única `tipo` + `referencia_id`) |
 
-### API REST (para o aplicativo)
+As tabelas da API v2 são criadas automaticamente ao subir a API (`api/schema.py`), inclusive em bancos que já existiam.
 
-Documentação interativa em `http://<host>:8000/docs`. Se `API_KEY` estiver definida no `.env`, envie o cabeçalho `X-API-Key` nas rotas `/api`.
+### API v2 (app mobile e dashboard web)
+
+Contrato usado pelo `mobile/` e pelo `web/`. Documentação interativa em `http://<host>:8000/docs`. Todas as rotas, exceto `/auth/*`, exigem `Authorization: Bearer <token>`. Erros seguem o formato `{"error": {"message", "fields"}, "request_id"}`.
+
+| Rota | Perfil | O que faz |
+| --- | --- | --- |
+| `POST /api/v2/auth/login` · `/auth/refresh` · `/auth/logout` | — | Login (token de 15 min e renovação rotativa de 7 dias) |
+| `GET /api/v2/me` | todos | Usuário logado |
+| `GET /api/v2/devices` · `/devices/{id}` | todos | Dispositivos com última leitura, `freshness`, `power_state`, `battery_pct` e alertas ativos |
+| `GET /api/v2/devices/{id}/readings?from&to&bucket` | todos | Histórico `raw`, `1m` ou `15m` com mín./máx./média por métrica |
+| `GET /api/v2/devices/{id}/incidents` | todos | Quedas de energia com início, fim e duração |
+| `GET /api/v2/alerts?state&device_id` | todos | Alertas `active`, `acknowledged` ou `resolved` |
+| `POST /api/v2/alerts/{id}/ack` | operator, admin | Reconhece o alerta com nota |
+| `GET` · `PUT /api/v2/devices/{id}/limits` | admin | Limites com controle de versão (HTTP 409 se outra sessão salvou antes) |
+
+**Alertas automáticos (ingestor):** `temperature_high/low`, `humidity_high/low` e `current_high` usam os limites do dispositivo com histerese e N amostras seguidas; `sensor_invalid` quando o DHT22 para de responder; `battery_low` abaixo de 20 %; `power_loss` entre `POWER_LOSS` e `POWER_RESTORED`; `telemetry_stale` após `STALE_ALERT_S` sem dados. Os limites padrão seguem a ASHRAE (18 a 27 °C) e a faixa de 40 a 60 % de umidade.
+
+**Usuários:** com `DEMO_USERS=true`, a API cria `admin@`, `operator@` e `viewer@sentinelacpd.demo` (senha `Sentinela123`), os mesmos da demonstração dos apps. Para contas reais, defina `ADMIN_EMAIL`/`ADMIN_PASSWORD` ou rode:
+
+```bash
+docker compose exec api python criar_usuario.py --email ana@empresa.com --nome "Ana" --papel operator
+```
+
+Senhas são guardadas com PBKDF2-SHA256; os tokens são assinados com `JWT_SECRET`.
+
+### API v1 (rotas simples)
+
+Mantidas para testes rápidos no navegador. Se `API_KEY` estiver definida, envie o cabeçalho `X-API-Key`.
 
 | Rota | O que devolve |
 | --- | --- |
 | `GET /health` | API e banco no ar (sem chave) |
-| `GET /api/status-cpd` | situação geral e último valor de cada dispositivo (online, alerta de temperatura, incidentes abertos) |
+| `GET /api/status-cpd` | situação geral e último valor de cada dispositivo |
 | `GET /api/telemetria?dispositivo=&de=&ate=&limite=` | histórico, mais recente primeiro (máx. 1000) |
-| `GET /api/incidentes?dispositivo=&status=&limite=` | lista de incidentes com duração |
-| `GET /api/incidentes/{id}` | incidente e eventos ocorridos nele |
+| `GET /api/incidentes?dispositivo=&status=&limite=` · `/api/incidentes/{id}` | incidentes com duração e eventos |
 | `GET /api/dispositivos` | dispositivos cadastrados |
-
-`status_geral` assume `NORMAL`, `EM_INCIDENTE`, `ALERTA_TEMPERATURA`, `OFFLINE` ou `SEM_DADOS`. Um dispositivo fica `online: false` após `ONLINE_TIMEOUT_S` (30 s) sem enviar dados.
 
 ### Alertas por Telegram
 
@@ -547,12 +575,12 @@ Detalhes de projeto: um alerta de offline só é emitido para dispositivo que j�
 ### Como subir
 
 ```bash
-cp .env.example .env        # defina senhas, TELEGRAM_TOKEN e TELEGRAM_CHAT_ID
+cp .env.example .env        # defina senhas, JWT_SECRET, TELEGRAM_TOKEN e TELEGRAM_CHAT_ID
 docker compose up -d --build
 docker compose logs -f ingestor
 ```
 
-Variáveis (`.env.example`): `MYSQL_*`, `API_KEY`, `TEMP_LIMITE` (35), `ONLINE_TIMEOUT_S` (30), `OFFLINE_S` (60), `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID`.
+Variáveis (`.env.example`): `MYSQL_*`, `JWT_SECRET`, `DEMO_USERS`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `STALE_AFTER_S` (15), `STALE_ALERT_S` (60), `CORS_ORIGINS`, `API_KEY`, `TEMP_LIMITE` (35), `ONLINE_TIMEOUT_S` (30), `OFFLINE_S` (60), `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID`.
 
 > 🔒 O arquivo `.env` contém senhas e o token do bot. Ele está no `.gitignore` e **nunca** deve ser publicado. Se o token vazar, gere outro com `/revoke` no `@BotFather`.
 
@@ -570,19 +598,21 @@ mosquitto_pub -h localhost -t sentinela/ESP32_CPD_01/evento -m '{"evento":"POWER
 * ✅ Abertura e fechamento de incidente (via evento MQTT) com cálculo de duração e alertas no Telegram.
 * ✅ Alerta de dispositivo offline e de retorno.
 * ✅ API consultada pelo Swagger e pelo navegador.
+* ✅ API v2 testada contra o contrato dos apps: 42 verificações automatizadas (login, perfis, dispositivos, histórico, alertas, reconhecimento, limites com conflito de versão, incidentes, CORS) e o próprio cliente do app mobile rodando contra a API real.
+* ✅ Motor de alertas testado com abertura e resolução por histerese, amostras seguidas, queda de energia, bateria baixa, sensor inválido e silêncio.
 * ⏳ Não testado ao vivo: alerta de temperatura (apenas simulado em teste automatizado).
-* ⏳ Os eventos de queda de energia foram **simulados** por publicação MQTT, sem corte real de energia. O firmware da Cloud ainda não envia `corrente` e `bateria`.
+* ⏳ Os eventos de queda de energia foram **simulados** por publicação MQTT, sem corte real de energia. O firmware já publica `bateria`, `rede` e os eventos, mas depende da ligação do PC817 e do divisor da bateria (`POWER_PRESENT_PIN` e `BATTERY_ADC_PIN`).
 
 ### Decisões de arquitetura e próximos passos
 
-Itens abaixo são **propostas**; ainda não estão implementados.
+Itens abaixo são **propostas**, exceto onde indicado.
 
 | Tema | Decisão |
 | --- | --- |
 | Banco de dados | Manter MySQL no volume atual; migrar para TimescaleDB se o volume de séries temporais crescer. MongoDB descartado: o modelo é relacional (dispositivo, leitura, incidente). |
 | Redis | Cache do último estado por dispositivo, rate limit e pub/sub para empurrar eventos ao app. |
-| OTA | Atualização por HTTPS disparada via MQTT, partições duplas, verificação SHA-256 e rollback automático. |
-| Segurança | Usuário/senha e ACL por tópico no EMQX, depois TLS (8883); JWT na API; backup e retenção de dados. |
+| OTA | Implementado no firmware (desabilitado por padrão): manifesto HTTPS assinado com RSA, SHA-256, duas partições e rollback. Ver `firmware/OTA_E_ENERGIA.md`. Falta hospedar os releases. |
+| Segurança | Usuário/senha e ACL por tópico no EMQX, depois TLS (8883); HTTPS na frente da API; backup e retenção de dados. (Login com JWT e perfis já implementado.) |
 | IA | Abordagem híbrida: regras e z-score para anomalias simples, Isolation Forest para padrões multivariados. |
 | Tempo real | WebSocket ou push para o aplicativo, em substituição ao polling. |
 
@@ -597,7 +627,7 @@ Esta é a primeira versão do sistema. Estes pontos serão tratados nas próxima
 * **Latência ponta a ponta:** ainda não foi medida. O campo `data_hora` registra o momento da gravação no banco e não permite calcular a latência isoladamente.
 * **Firmware:** o cálculo do RMS bloqueia o laço por 200 ms a cada ciclo e a reconexão MQTT é bloqueante. Se o DHT22 falhar, a leitura do ciclo inteiro (inclusive a corrente) não é publicada.
 * **Segurança da comunicação:** o tráfego MQTT ainda está em texto claro (porta 1883). TLS está previsto para a N2. Na stack de Cloud em fase de testes, o broker ainda não exige usuário e senha.
-* **Eventos de energia:** o fluxo de incidentes foi validado com eventos simulados; a detecção real (Last-Gasp com bateria) depende da integração do firmware.
+* **Eventos de energia:** o fluxo de incidentes foi validado com eventos simulados. O firmware já envia os eventos, mas a detecção real depende de ligar o PC817 e o divisor da bateria e de um ensaio de queda de energia em bancada.
 * **Visualização:** a consulta aos dados é feita pelo MySQL Workbench, pela API e pelo dashboard web em desenvolvimento.
 
 ---
@@ -630,9 +660,17 @@ SentinelaCPD/
 │   ├── diagrama_sistema.png
 │   └── esquematico_circuito.png
 │
-├── firmware/               # Código C++ do ESP32
-│   ├── firmware.ino        # Amostragem, RMS e loop MQTT
-│   └── config.example.h    # Modelo de configuração (Wi-Fi, broker, pinos)
+├── firmware/               # Código C++ do ESP32 (Arduino IDE)
+│   ├── firmware.ino        # Coleta, RMS, portal Wi-Fi, MQTT e OTA
+│   ├── TelemetryContract.h # Tópicos, bateria, eventos de energia e JSON
+│   ├── SecureOta.h         # Atualização remota assinada (desabilitada por padrão)
+│   ├── PowerMonitor.h      # Presença da fonte (PC817) e tensão da bateria
+│   ├── config.example.h    # Modelo de configuração (copiar para config.h)
+│   └── README.md / OTA_E_ENERGIA.md
+│
+├── firmware-idf/           # Perfil ESP-IDF 5.5 (bootloader com rollback)
+├── tools/sign_release.py   # Assinatura de releases OTA
+├── tests/firmware/         # Testes C++ e Python do firmware
 │
 ├── docker/                 # Backend da N1
 │   ├── docker-compose.yml  # Serviços EMQX e MySQL 8.0
@@ -641,15 +679,16 @@ SentinelaCPD/
 │   └── mysql/
 │       └── init.sql        # Schema de telemetria (volume novo)
 │
-├── web/                    # Dashboard web
+├── web/                    # Dashboard web (React + Vite)
+├── mobile/                 # App mobile (Expo SDK 58)
 │
 │   # Cloud da N2 (ingestão, API e alertas)
 ├── docker-compose.yml      # EMQX, MySQL, ingestor, api e notifier
 ├── .env.example            # Modelo de variáveis da Cloud (sem segredos)
 ├── db/
 │   └── init.sql            # Schema: dispositivos, leituras, eventos, incidentes
-├── ingestor/               # Assinatura MQTT e gravação no banco
-├── api/                    # API REST (FastAPI)
+├── ingestor/               # Assinatura MQTT, gravação e motor de alertas
+├── api/                    # API v2 e v1 (FastAPI), migração e criar_usuario.py
 └── notifier/               # Alertas por Telegram
 ```
 
@@ -706,7 +745,7 @@ Em um volume novo, `docker/mysql/init.sql` cria automaticamente a tabela de tele
 
 Siga [Configuração EMQX → MySQL](docker/EMQX_SETUP.md) para criar o Connector, a regra SQL, o Sink e configurar a autenticação MQTT. A configuração do EMQX é manual; o Compose, sozinho, não provisiona esse pipeline. O guia inclui cuidados para volumes já existentes e verificação dos registros.
 
-> Na stack da Cloud (raiz do repositório), o schema usa as tabelas `leituras`, `eventos` e `incidentes`, criadas automaticamente pelo `db/init.sql`, e não depende do Data Bridge.
+> Na stack da Cloud (raiz do repositório), o schema usa as tabelas `leituras`, `eventos`, `incidentes`, `alertas`, `limites` e `usuarios`, criadas automaticamente pelo `db/init.sql` e pela migração da API, e não depende do Data Bridge.
 
 ### 3. Firmware
 
@@ -739,17 +778,19 @@ Siga [Configuração EMQX → MySQL](docker/EMQX_SETUP.md) para criar o Connecto
 ### Marco N2 (em desenvolvimento)
 
 - [x] Serviço de ingestão em Python com modelo de incidentes de energia (abertura, fechamento e duração).
-- [x] API REST para o aplicativo móvel e web.
+- [x] API REST para o aplicativo móvel e web (API v2 com login, perfis, alertas e limites).
 - [x] Alertas por Telegram (queda de energia, temperatura, dispositivo offline).
 - [x] Infraestrutura da Cloud reproduzível com Docker Compose.
 - [ ] Alimentação de contingência com bateria 18650 (a placa já possui suporte e circuito de carga).
-- [ ] Detecção real de queda de energia e envio de `LAST_GASP` pelo firmware.
+- [x] Firmware publica bateria, estado da fonte e eventos `POWER_LOSS`/`POWER_RESTORED`.
+- [ ] Ligar o PC817 e o divisor da bateria e validar a queda de energia real em bancada.
 - [ ] Dashboard web em tempo real via WebSockets.
 - [ ] Consumo acumulado (kWh) e estimativa de custo.
 - [ ] Autenticação e ACL no MQTT e comunicação criptografada com TLS (MQTTS, porta 8883).
 - [ ] Calibração da corrente com instrumento de referência e medição de latência.
 - [ ] Reconexão MQTT não bloqueante e `cliente_id` fixo por placa (baseado no MAC).
-- [ ] Redis (cache de estado e pub/sub), atualização OTA e detecção de anomalias com IA (propostas documentadas).
+- [x] Atualização OTA assinada no firmware (desabilitada até validar em bancada).
+- [ ] Redis (cache de estado e pub/sub) e detecção de anomalias com IA (propostas documentadas).
 
 ---
 

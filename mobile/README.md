@@ -73,3 +73,5 @@ Configure EXPO_PUBLIC_API_BASE=http://192.168.0.10:8000/api/v2 no .env.local.
 Use o IP do computador que executa a API, acessível na mesma rede do celular. O servidor deve escutar na interface de rede e permitir a origem web por CORS. Uma página HTTPS precisa de API HTTPS ou proxy na mesma origem.
 
 Mocks só são ativados explicitamente por EXPO_PUBLIC_USE_MOCKS=true. Para API real, use false ou remova a variável e reinicie/recompile a aplicação. No celular, localhost aponta para o próprio celular.
+
+Teste com o Cloud real: suba o Docker na raiz do repositório (`docker compose up -d`), libere a porta 8000 no firewall do Windows e use os usuários cadastrados na API. Com `DEMO_USERS=true` no `.env` do Cloud, os mesmos logins da demonstração (`admin@`, `operator@` e `viewer@sentinelacpd.demo`, senha `Sentinela123`) funcionam com os dados reais do ESP32.
