@@ -32,7 +32,7 @@ npm run preview
 
 ## API real
 
-Crie `.env.local` com `VITE_USE_MOCKS=false` e `VITE_API_BASE=https://SEU_HOST/api/v2`, então reinicie o Vite ou gere um novo build. Para implantação estática, configure fallback de rotas para `index.html`.
+Com o Cloud rodando (`docker compose up -d` na raiz do repositório), crie `.env.local` com `VITE_USE_MOCKS=false`. Em `npm run dev`, o caminho padrão `/api/v2` é repassado pelo proxy do Vite para `VITE_PROXY_TARGET` (padrão `http://localhost:8000`). Para um build publicado em outro endereço, use `VITE_API_BASE=https://SEU_HOST/api/v2` e informe a origem do site em `CORS_ORIGINS` no `.env` do Cloud. Os logins são os usuários cadastrados na API (veja a seção Cloud do README principal). Para implantação estática, configure fallback de rotas para `index.html`.
 
 O frontend aceita o refresh token em memória quando retornado em JSON. Para restaurar a sessão após recarregar a página, o backend web precisa disponibilizar refresh rotativo em cookie HttpOnly com os atributos adequados, pois a aplicação não grava tokens em armazenamento persistente. O cliente envia credenciais e usa Bearer para o access token. A política de CORS, cookies, CSRF, autenticação e RBAC da API real precisa ser aplicada no servidor. A API e o ESP32 não foram disponibilizados para homologação.
 
