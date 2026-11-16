@@ -19,3 +19,23 @@
 // --- Calibração dos Sensores ---
 // Mantenha o fator já usado na bancada. Este é apenas o exemplo da N1.
 #define FATOR_CALIBRACAO_CORRENTE 0.00055f
+
+
+// --- Energia: manter -1 até confirmar circuito, GPIO e níveis elétricos ---
+#define POWER_PRESENT_PIN -1
+#define POWER_PRESENT_LEVEL 1
+#define BATTERY_ADC_PIN -1
+#define BATTERY_DIVIDER_RATIO 0.0f
+#define BATTERY_CALIBRATION 1.0f
+
+// --- OTA: habilitar somente com bootloader rollback validado, sensor de fonte e TLS ---
+#define OTA_ENABLED 0
+#define OTA_MANIFEST_URL ""
+#define OTA_RELEASE_PREFIX "" // https://servidor/releases/ (barra final obrigatória)
+#define OTA_CA_PEM "" // CA em PEM: usar literal R"PEM(...)PEM"
+#define OTA_PUBLIC_KEY_PEM "" // SOMENTE a chave pública RSA; privada fica fora do Git/dispositivo
+
+// Backend precisa oferecer MQTTS, credenciais por dispositivo e ACL.
+#define MQTT_TLS_ENABLED 0
+#define MQTT_CA_PEM ""
+// Com TLS, configurar MQTT_PORT conforme o listener MQTTS real (normalmente 8883).

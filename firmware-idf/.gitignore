@@ -1,0 +1,6 @@
+components/
+managed_components/
+build/
+sdkconfig
+sdkconfig.old
+dependencies.lock

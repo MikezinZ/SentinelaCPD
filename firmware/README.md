@@ -1,4 +1,4 @@
-# Firmware — etapa 1: operação autônoma e configuração de Wi-Fi
+# Atualização em preparação: OTA e energia\n\nA revisão OTA está descrita em [OTA_E_ENERGIA.md](OTA_E_ENERGIA.md). Ela adiciona código, perfil de bootloader com rollback e monitoramento opcional da alimentação. OTA vem desabilitado e requer ligação de presença de fonte, HTTPS/chaves, bootloader correspondente e teste físico. A tabela de partições nova exige planejamento da primeira gravação USB. As instruções abaixo registram a etapa anterior de conectividade e seus testes.\n\n# Firmware — etapa 1: operação autônoma e configuração de Wi-Fi
 
 Proposta para teste na placa ESP32-WROOM-32 dual-core. Base: firmware N1 do repositório, blob `11ff8f13e42eefe8d82ea738af5099ec9532ffa9`.
 
@@ -106,3 +106,4 @@ arduino-cli compile --fqbn esp32:esp32:esp32 --warnings all firmware
 ## Próximos incrementos
 
 Contrato v2 e qualidade por métrica; TLS e credenciais por dispositivo; fila limitada com deduplicação/ACK após commit; OTA com partições e recuperação; integração definitiva com API/banco. Não instalar hardware adicional para esta etapa.
+

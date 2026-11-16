@@ -9,16 +9,25 @@
 #include <freertos/queue.h>
 #include "RuntimePolicy.h"
 #include "config.h"
+#include "PowerMonitor.h"
+#include "SecureOta.h"
 
 #ifndef CONFIG_AP_PASSWORD
 #error "Atualize config.h pelo config.example.h: configure CONFIG_AP_PASSWORD."
 #endif
 
+// Impedir confirmação automática pelo Arduino antes do teste local.
+extern "C" bool verifyRollbackLater() { return true; }
+
 using namespace sentinela;
 constexpr int DHT_PIN = 27;
 constexpr int CURRENT_PIN = 34;
 DHT dht(DHT_PIN, DHT22);
+#if MQTT_TLS_ENABLED
+WiFiClientSecure transport;
+#else
 WiFiClient transport;
+#endif
 PubSubClient mqtt(transport);
 WebServer server(80);
 Preferences preferences;
@@ -26,6 +35,8 @@ Credentials saved, candidate;
 Retry mqttRetry;
 QueueHandle_t latestQueue = nullptr;
 struct Sample {
+  float batteryVolts;
+  int externalPower;
   uint32_t seq, at;
   float temperature, humidity, current;
 };
@@ -41,6 +52,8 @@ String notice = "Informe o nome exato da rede Wi-Fi e a senha.";
 // Coleta em tarefa própria: timeouts de HTTP/MQTT não interrompem a aquisição.
 // A fila de tamanho 1 contém SOMENTE a última amostra, não é histórico offline.
 void sampleTask(void*) {
+  PowerMonitor power;power.begin();
+  esp_task_wdt_add(nullptr);
   dht.begin();
   pinMode(CURRENT_PIN, INPUT);
   analogReadResolution(12);
@@ -48,7 +61,10 @@ void sampleTask(void*) {
   uint32_t seq = 0;
   vTaskDelayUntil(&wake, pdMS_TO_TICKS(SAMPLE_MS));
   for (;;) {
+    esp_task_wdt_reset();
+    power.sample();
     Sample sample{};
+    sample.batteryVolts=power.volts;sample.externalPower=power.filter.state;
     sample.seq = ++seq;
     sample.temperature = dht.readTemperature();
     sample.humidity = dht.readHumidity();
@@ -96,6 +112,9 @@ void handleStatus() {
   json += ",\"humidity\":" + jsonNumber(available ? sample.humidity : NAN);
   json += ",\"current\":" + jsonNumber(available ? sample.current : NAN);
   json += ",\"age_ms\":" + (available ? String(uint32_t(millis() - sample.at)) : String("null"));
+  json += ",\"firmware\":\"" + String(FIRMWARE_VERSION) + "\"";
+  json += ",\"battery_volts\":" + jsonNumber(available ? sample.batteryVolts : NAN);
+  json += ",\"external_power\":" + String(!available || sample.externalPower<0 ? "null" : sample.externalPower ? "true" : "false");
   json += "}";
   server.send(200, "application/json", json);
 }
@@ -115,7 +134,7 @@ void handleHome() {
 <p id="message">Carregando estado...</p><pre id="sensors"></pre>
 <small>A senha só é salva após obter IP. Isso não comprova acesso à internet ou ao broker.
 O portal fecha após sucesso ou ao completar 10 minutos. Não é necessário manter o celular conectado.</small>
-<script>async function refresh(){try{const s=await(await fetch('/status',{cache:'no-store'})).json();document.getElementById('message').textContent=s.message;document.getElementById('sensors').textContent=s.device_id+'\nWi-Fi: '+s.wifi+' | MQTT: '+s.mqtt+'\nAmostra: '+s.seq+' | Idade: '+s.age_ms+' ms\nTemperatura: '+s.temperature+' °C\nUmidade: '+s.humidity+' %\nCorrente: '+s.current+' A';}catch(e){document.getElementById('message').textContent='Portal indisponível. Se houve sucesso, o dispositivo encerrou a configuração.';}}refresh();setInterval(refresh,2000);</script></html>)HTML";
+<script>async function refresh(){try{const s=await(await fetch('/status',{cache:'no-store'})).json();document.getElementById('message').textContent=s.message;document.getElementById('sensors').textContent=s.device_id+'\nWi-Fi: '+s.wifi+' | MQTT: '+s.mqtt+'\nAmostra: '+s.seq+' | Idade: '+s.age_ms+' ms\nTemperatura: '+s.temperature+' °C\nUmidade: '+s.humidity+' %\nCorrente: '+s.current+' A\nBateria: '+s.battery_volts+' V | Fonte externa: '+s.external_power;}catch(e){document.getElementById('message').textContent='Portal indisponível. Se houve sucesso, o dispositivo encerrou a configuração.';}}refresh();setInterval(refresh,2000);</script></html>)HTML";
   server.send(200, "text/html; charset=utf-8", html);
 }
 
@@ -258,6 +277,9 @@ void serviceWifi() {
 }
 
 void serviceMqtt() {
+#if MQTT_TLS_ENABLED
+  if(strlen(MQTT_CA_PEM)<50 || !strlen(MQTT_USER) || !strlen(MQTT_PASS) || time(nullptr)<=1767225600)return;
+#endif
   // Durante o portal, priorizar a configuração; coleta continua na outra tarefa.
   if (portalActive || candidatePending || WiFi.status() != WL_CONNECTED || !strlen(MQTT_BROKER)) return;
   if (!mqtt.connected()) {
@@ -302,6 +324,7 @@ void setup() {
   snprintf(apName, sizeof(apName), "SentinelaCPD-%04X%08X",
     unsigned((mac >> 32) & 0xffff), unsigned(mac & 0xffffffff));
   Serial.printf("\n[BOOT] firmware etapa1 | ID %s\n", deviceId);
+  secureOta::begin();
   latestQueue = xQueueCreate(1, sizeof(Sample));
   if (!latestQueue || xTaskCreatePinnedToCore(sampleTask, "sensors", 4096, nullptr, 1, nullptr, 1) != pdPASS) {
     Serial.println("[ERRO] Coleta nao iniciou. Reiniciar e verificar memoria.");
@@ -327,6 +350,11 @@ void setup() {
   server.on("/status", HTTP_GET, handleStatus);
   server.on("/configure", HTTP_POST, handleConfigure);
   server.onNotFound([](){ if (apRequest()) server.send(404, "text/plain", "Pagina inexistente."); });
+#if MQTT_TLS_ENABLED
+  transport.setCACert(MQTT_CA_PEM);
+  transport.setHandshakeTimeout(15);
+  configTime(0,0,"pool.ntp.org","time.google.com");
+#endif
   mqtt.setServer(MQTT_BROKER, MQTT_PORT);
   mqtt.setSocketTimeout(3);
   mqtt.setKeepAlive(20);
@@ -338,6 +366,11 @@ void setup() {
 void loop() {
   serviceWifi();
   if (portalActive) server.handleClient();
+  Sample healthSample{};
+  const bool haveSample=latestQueue && xQueuePeek(latestQueue,&healthSample,0)==pdTRUE;
+  secureOta::observe(haveSample?healthSample.seq:0,haveSample?uint32_t(millis()-healthSample.at):UINT32_MAX,
+    storageReady,haveSample?healthSample.externalPower:-1,portalActive);
   serviceMqtt();
   delay(5); // ceder CPU, sem esperar por conexão
 }
+
