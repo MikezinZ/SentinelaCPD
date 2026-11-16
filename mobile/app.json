@@ -1,13 +1,33 @@
 {
   "expo": {
-    "name": "Sentinela CPD",
-    "slug": "sentinela-cpd",
+    "name": "SentinelaCPD",
+    "slug": "sentinelacpd-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "userInterfaceStyle": "dark",
+    "scheme": "sentinelacpd",
+    "userInterfaceStyle": "light",
     "newArchEnabled": true,
-    "ios": { "supportsTablet": true, "bundleIdentifier": "com.sentinela.cpd" },
-    "android": { "package": "com.sentinela.cpd" },
-    "plugins": ["expo-secure-store"]
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "br.edu.sentinelacpd.mobile"
+    },
+    "android": {
+      "package": "br.edu.sentinelacpd.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#0f172a"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store"
+    ],
+    "experiments": {
+      "typedRoutes": false
+    }
   }
 }
+

@@ -17,7 +17,8 @@
 
 **🔗 GitPage:** [mikezinz.github.io/SentinelaCPD](https://mikezinz.github.io/SentinelaCPD/)  
 **📦 Repositório:** [github.com/MikezinZ/SentinelaCPD](https://github.com/MikezinZ/SentinelaCPD)
-**Dashboard web:** [demonstração pública](https://sentinela-cpd.arisenalto1.chatgpt.site) · [código e instruções](web/README.md)
+**Dashboard web:** [demonstração pública](https://sentinela-cpd.arisenalto1.chatgpt.site) · [código e instruções](web/README.md)  
+**Aplicativo mobile (Expo / iOS & Android):** [código e instruções](mobile/README.md)
 
 ---
 
