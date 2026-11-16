@@ -1,0 +1,73 @@
+name: Validate mobile and web
+on:
+  push:
+    branches: [validation/mobile-web-0c873f0]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  mobile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: mobile
+    env:
+      CI: "1"
+      EXPO_PUBLIC_USE_MOCKS: "true"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 0c873f0594a4b73d420275c49b6b766c43c9b8cd
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Expo Doctor
+        if: ${{ !cancelled() }}
+        run: npx --yes expo-doctor
+      - name: Check Expo dependency alignment
+        if: ${{ !cancelled() }}
+        run: npx expo install --check
+      - name: Typecheck
+        if: ${{ !cancelled() }}
+        run: npm run typecheck
+      - name: Unit tests
+        if: ${{ !cancelled() }}
+        run: npm test
+      - name: Compile web bundle in demo mode
+        if: ${{ !cancelled() }}
+        run: npx expo export --platform web
+      - name: Compile iOS bundle in demo mode
+        if: ${{ !cancelled() }}
+        run: npx expo export --platform ios
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    env:
+      VITE_USE_MOCKS: "true"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 0c873f0594a4b73d420275c49b6b766c43c9b8cd
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Unit tests
+        if: ${{ !cancelled() }}
+        run: npm test
+      - name: Typecheck and production build
+        if: ${{ !cancelled() }}
+        run: npm run build
