@@ -48,6 +48,7 @@ services:
       DB_USER: ${MYSQL_USER}
       DB_PASSWORD: ${MYSQL_PASSWORD}
       DEVICE_PADRAO: ESP32_CPD_01
+      STALE_ALERT_S: ${STALE_ALERT_S:-60}
 
   notifier:
     build: ./notifier
@@ -83,6 +84,12 @@ services:
       API_KEY: ${API_KEY:-}
       TEMP_LIMITE: ${TEMP_LIMITE:-35}
       ONLINE_TIMEOUT_S: ${ONLINE_TIMEOUT_S:-30}
+      JWT_SECRET: ${JWT_SECRET:-}
+      DEMO_USERS: ${DEMO_USERS:-false}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      STALE_AFTER_S: ${STALE_AFTER_S:-15}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
 
 volumes:
   emqx_data:

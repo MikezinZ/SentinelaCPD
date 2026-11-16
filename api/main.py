@@ -1,15 +1,22 @@
-"""SentinelaCPD - API REST (consumida pelo app Mobile e pelo dashboard).
+"""SentinelaCPD - API REST.
+
+- /api/v2/...  contrato do app mobile e do dashboard web (login, perfis, alertas, limites). Ver v2.py.
+- /api/...     rotas v1 (resumo simples, usadas na N2 inicial e para testes rápidos).
 
 Documentação interativa: http://<host>:8000/docs
-Se API_KEY estiver definida, todas as rotas /api exigem o cabeçalho X-API-Key.
+Se API_KEY estiver definida, as rotas v1 exigem o cabeçalho X-API-Key.
 """
 import os
 from datetime import datetime
 from typing import Optional
 
 import mysql.connector.pooling
-from fastapi import Depends, FastAPI, Header, HTTPException, Query
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+import v2
 
 API_KEY = os.getenv("API_KEY", "")
 ONLINE_TIMEOUT_S = int(os.getenv("ONLINE_TIMEOUT_S", "30"))   # sem contato além disso = OFFLINE
@@ -50,8 +57,56 @@ def verificar_chave(x_api_key: Optional[str] = Header(default=None)):
         raise HTTPException(status_code=401, detail="Chave de API inválida ou ausente")
 
 
-app = FastAPI(title="SentinelaCPD API", version="0.1.0")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET"], allow_headers=["*"])
+app = FastAPI(title="SentinelaCPD API", version="0.2.0")
+
+# CORS: o dashboard web envia credenciais, então a origem precisa ser ecoada (não "*").
+_origens = [o.strip() for o in os.getenv("CORS_ORIGINS", "").split(",") if o.strip()]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_origens,
+    allow_origin_regex=None if _origens else ".*",
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "X-API-Key"],
+)
+app.include_router(v2.router)
+
+
+@app.on_event("startup")
+def _iniciar():
+    v2.preparar_banco()
+
+
+def _eh_v2(request: Request) -> bool:
+    return request.url.path.startswith("/api/v2")
+
+
+@app.exception_handler(v2.ApiErro)
+async def _erro_v2(request: Request, exc: v2.ApiErro):
+    return v2.resposta_erro(exc.status, exc.message, exc.fields)
+
+
+@app.exception_handler(StarletteHTTPException)
+async def _erro_http(request: Request, exc: StarletteHTTPException):
+    if _eh_v2(request):
+        mensagem = "Recurso não encontrado." if exc.status_code == 404 else str(exc.detail)
+        return v2.resposta_erro(exc.status_code, mensagem)
+    from fastapi.exception_handlers import http_exception_handler
+    return await http_exception_handler(request, exc)
+
+
+@app.exception_handler(RequestValidationError)
+async def _erro_validacao(request: Request, exc: RequestValidationError):
+    if _eh_v2(request):
+        return v2.resposta_erro(400, "Parâmetros inválidos.")
+    from fastapi.exception_handlers import request_validation_exception_handler
+    return await request_validation_exception_handler(request, exc)
+
+
+@app.exception_handler(Exception)
+async def _erro_interno(request: Request, exc: Exception):
+    print(f"[api] erro em {request.url.path}: {exc!r}")
+    return v2.resposta_erro(500, "Erro interno no servidor.")
 
 
 @app.get("/health")
