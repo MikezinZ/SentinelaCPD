@@ -1,22 +1,28 @@
 """SentinelaCPD - Telemetry Ingestion Service.
 
-Assina o broker MQTT, valida as mensagens e grava no MySQL.
+Assina o broker MQTT, valida as mensagens, grava no MySQL e alimenta o motor
+de alertas da API v2 (alertas.py).
 
 Tópicos:
-  sentinela/<id>/telemetria   {"temperatura": 27.8, "umidade": 45.4, "corrente": 0.8, "bateria": 87}
+  sentinela/<id>/telemetria   {"temperatura": 27.8, "umidade": 45.4, "corrente": 0.8, "bateria": 87, "rede": true}
   sentinela/<id>/evento       {"evento": "POWER_LOSS" | "LAST_GASP" | "POWER_RESTORED", ...}
   esp32/telemetria            (legado da N1, sem id: usa DEVICE_PADRAO)
 """
 import json
 import os
+import threading
 import time
 
 import mysql.connector
 import paho.mqtt.client as mqtt
 
+from alertas import MotorAlertas
+from schema import migrar
+
 MQTT_HOST = os.getenv("MQTT_HOST", "localhost")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 DEVICE_PADRAO = os.getenv("DEVICE_PADRAO", "ESP32_CPD_01")
+STALE_ALERT_S = int(os.getenv("STALE_ALERT_S", "60"))   # sem dados além disso = alerta telemetry_stale
 
 DB = dict(
     host=os.getenv("DB_HOST", "localhost"),
@@ -27,6 +33,7 @@ DB = dict(
 
 EVENTOS_VALIDOS = {"POWER_LOSS", "LAST_GASP", "POWER_RESTORED"}
 _conn = None
+motor = MotorAlertas()
 
 
 def conn():
@@ -56,6 +63,7 @@ def tratar_telemetria(disp, d):
     umid = num(d, "umidade", 0, 100)
     corr = num(d, "corrente", 0, 1000)
     bat = num(d, "bateria", 0, 100)
+    rede = d.get("rede") if isinstance(d.get("rede"), bool) else None
     if temp is None and umid is None and corr is None:
         print(f"[telemetria] descartada (sem valores válidos): {d}")
         return
@@ -67,8 +75,14 @@ def tratar_telemetria(disp, d):
         (disp, temp, umid, corr, bat),
     )
     cur.execute("UPDATE dispositivos SET ultimo_contato = NOW() WHERE id = %s", (disp,))
+    if rede is not None:   # estado da fonte informado pelo firmware (PC817)
+        cur.execute("UPDATE dispositivos SET energia=%s WHERE id=%s", ("mains" if rede else "battery", disp))
+    try:
+        motor.telemetria(cur, disp, temp, umid, corr, bat)
+    except Exception as e:  # alerta nunca pode impedir a gravação da leitura
+        print(f"[alerta] erro: {e}")
     cur.close()
-    print(f"[telemetria] {disp} T={temp} U={umid} I={corr} B={bat}")
+    print(f"[telemetria] {disp} T={temp} U={umid} I={corr} B={bat} rede={rede}")
 
 
 def tratar_evento(disp, d):
@@ -83,7 +97,7 @@ def tratar_evento(disp, d):
         (disp, tipo, json.dumps(d)),
     )
     if tipo in ("POWER_LOSS", "LAST_GASP"):
-        cur.execute("UPDATE dispositivos SET estado='ON_BATTERY' WHERE id=%s", (disp,))
+        cur.execute("UPDATE dispositivos SET estado='ON_BATTERY', energia='battery' WHERE id=%s", (disp,))
         cur.execute(
             "SELECT id FROM incidentes WHERE dispositivo_id=%s AND status='ABERTO' LIMIT 1",
             (disp,),
@@ -92,7 +106,7 @@ def tratar_evento(disp, d):
             cur.execute("INSERT INTO incidentes (dispositivo_id) VALUES (%s)", (disp,))
             print(f"[incidente] ABERTO para {disp}")
     elif tipo == "POWER_RESTORED":
-        cur.execute("UPDATE dispositivos SET estado='NORMAL' WHERE id=%s", (disp,))
+        cur.execute("UPDATE dispositivos SET estado='NORMAL', energia='mains' WHERE id=%s", (disp,))
         cur.execute(
             "UPDATE incidentes SET status='FECHADO', fim=NOW(), "
             "duracao_s=TIMESTAMPDIFF(SECOND, inicio, NOW()) "
@@ -100,6 +114,10 @@ def tratar_evento(disp, d):
             (disp,),
         )
         print(f"[incidente] FECHADO para {disp}")
+    try:
+        motor.evento(cur, disp, tipo)
+    except Exception as e:
+        print(f"[alerta] erro: {e}")
     cur.close()
     print(f"[evento] {disp} {tipo}")
 
@@ -125,16 +143,33 @@ def on_message(client, userdata, msg):
         print(f"[erro] {msg.topic}: {e}")
 
 
-def main():
-    # espera o MySQL aceitar conexões
+def vigiar_silencio():
+    """Thread própria (conexão própria): alerta dispositivos que pararam de enviar."""
+    c = None
     while True:
         try:
-            conn()
+            if c is None or not c.is_connected():
+                c = mysql.connector.connect(**DB, autocommit=True)
+            cur = c.cursor()
+            motor.verificar_silencio(cur, STALE_ALERT_S)
+            cur.close()
+        except Exception as e:
+            print(f"[alerta] verificação de silêncio falhou: {e}")
+            c = None
+        time.sleep(10)
+
+
+def main():
+    # espera o MySQL aceitar conexões e garante as tabelas da API v2
+    while True:
+        try:
+            migrar(conn())
             break
         except Exception as e:
             print(f"[db] aguardando MySQL: {e}")
             time.sleep(3)
 
+    threading.Thread(target=vigiar_silencio, daemon=True).start()
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="sentinela-ingestor")
     client.on_connect = on_connect
     client.on_message = on_message
