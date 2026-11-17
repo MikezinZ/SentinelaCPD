@@ -72,12 +72,17 @@ inline const char* jsonPower(int state) { return state < 0 ? "null" : state ? "t
 
 // {"temperatura":24.3,"umidade":57.1,"corrente":0.08,"bateria":87,"rede":true}
 inline int buildTelemetry(char* out, size_t size, float temperature, float humidity,
-                          float current, int battery, int externalPower) {
+                          float current, int battery, int externalPower,
+                          const char* firmware = nullptr) {
   char t[16], h[16], c[16], b[8];
   jsonNumber(t, sizeof t, temperature, 1);
   jsonNumber(h, sizeof h, humidity, 1);
   jsonNumber(c, sizeof c, current, 2);
   if (battery < 0) snprintf(b, sizeof b, "null"); else snprintf(b, sizeof b, "%d", battery);
+  if (firmware && *firmware)
+    return snprintf(out, size,
+      "{\"temperatura\":%s,\"umidade\":%s,\"corrente\":%s,\"bateria\":%s,\"rede\":%s,\"firmware\":\"%s\"}",
+      t, h, c, b, jsonPower(externalPower), firmware);
   return snprintf(out, size,
     "{\"temperatura\":%s,\"umidade\":%s,\"corrente\":%s,\"bateria\":%s,\"rede\":%s}",
     t, h, c, b, jsonPower(externalPower));

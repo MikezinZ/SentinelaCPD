@@ -46,6 +46,8 @@ int main() {
   assert(strcmp(json, "{\"temperatura\":24.3,\"umidade\":57.1,\"corrente\":0.08,\"bateria\":87,\"rede\":true}") == 0);
   buildTelemetry(json, sizeof json, 24.3f, 57.1f, 0.08f, -1, -1);
   assert(strstr(json, "\"bateria\":null,\"rede\":null"));
+  buildTelemetry(json, sizeof json, 24.3f, 57.1f, 0.08f, 87, 1, "0.3.0");
+  assert(strstr(json, "\"rede\":true,\"firmware\":\"0.3.0\"}"));
   buildPowerEvent(json, sizeof json, POWER_LOSS_EVENT, 29.4f, NAN, 87);
   assert(strcmp(json, "{\"evento\":\"POWER_LOSS\",\"estado\":\"ON_BATTERY\",\"temperatura\":29.4,\"umidade\":null,\"bateria\":87}") == 0);
   buildPowerEvent(json, sizeof json, POWER_RESTORED_EVENT, NAN, NAN, -1);
