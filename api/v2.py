@@ -342,7 +342,13 @@ def validar_limites(v):
 router = APIRouter(prefix="/api/v2", tags=["v2"])
 
 
-@router.post("/auth/login")
+def corpo(exemplo: dict) -> dict:
+    """Mostra a caixa de corpo JSON no Swagger (/docs) para rotas que leem o corpo manualmente."""
+    return {"requestBody": {"required": True, "content": {"application/json": {
+        "schema": {"type": "object"}, "example": exemplo}}}}
+
+
+@router.post("/auth/login", openapi_extra=corpo({"email": "admin@sentinelacpd.demo", "password": "Sentinela123"}))
 async def login(request: Request):
     dados = await ler_corpo(request)
     email = str(dados.get("email") or "").strip().lower()
@@ -354,7 +360,7 @@ async def login(request: Request):
     return nova_sessao(u)
 
 
-@router.post("/auth/refresh")
+@router.post("/auth/refresh", openapi_extra=corpo({"refresh_token": "cole_o_refresh_token"}))
 async def refresh(request: Request):
     dados = await ler_corpo(request)
     token = str(dados.get("refresh_token") or "")
@@ -369,7 +375,7 @@ async def refresh(request: Request):
     return nova_sessao(u)
 
 
-@router.post("/auth/logout", status_code=204)
+@router.post("/auth/logout", status_code=204, openapi_extra=corpo({"refresh_token": "cole_o_refresh_token"}))
 async def logout(request: Request):
     dados = await ler_corpo(request)
     token = str(dados.get("refresh_token") or "")
@@ -494,7 +500,7 @@ def alerts(state: Optional[str] = None, device_id: Optional[str] = None, cursor:
     return {"items": [alerta_json(a) for a in linhas[:PAGE]], "next_cursor": proximo_cursor(offset, PAGE, len(linhas))}
 
 
-@router.post("/alerts/{alert_id}/ack")
+@router.post("/alerts/{alert_id}/ack", openapi_extra=corpo({"note": "Verificado no local."}))
 async def acknowledge(alert_id: str, request: Request, u=Depends(usuario_atual)):
     if u["papel"] == "viewer":
         raise ApiErro(403, "Perfil sem permissão para reconhecer alertas.")
@@ -533,7 +539,10 @@ def get_limits(device_id: str, u=Depends(usuario_atual)):
     return limites_de(device_id)[0]
 
 
-@router.put("/devices/{device_id}/limits")
+@router.put("/devices/{device_id}/limits", openapi_extra=corpo({
+    "version": 1, "temperature_min": 18, "temperature_max": 27, "humidity_min": 40, "humidity_max": 60,
+    "current_max": None, "temperature_hysteresis": 1, "humidity_hysteresis": 3, "current_hysteresis": None,
+    "consecutive_samples": 3}))
 async def put_limits(device_id: str, request: Request, u=Depends(usuario_atual)):
     buscar_dispositivo(device_id)
     exigir_admin(u)
