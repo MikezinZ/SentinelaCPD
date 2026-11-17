@@ -64,6 +64,8 @@ def tratar_telemetria(disp, d):
     corr = num(d, "corrente", 0, 1000)
     bat = num(d, "bateria", 0, 100)
     rede = d.get("rede") if isinstance(d.get("rede"), bool) else None
+    fw = d.get("firmware")
+    fw = fw.strip()[:32] if isinstance(fw, str) and fw.strip() else None
     if temp is None and umid is None and corr is None:
         print(f"[telemetria] descartada (sem valores válidos): {d}")
         return
@@ -77,6 +79,8 @@ def tratar_telemetria(disp, d):
     cur.execute("UPDATE dispositivos SET ultimo_contato = NOW() WHERE id = %s", (disp,))
     if rede is not None:   # estado da fonte informado pelo firmware (PC817)
         cur.execute("UPDATE dispositivos SET energia=%s WHERE id=%s", ("mains" if rede else "battery", disp))
+    if fw:   # versão do firmware, exibida no app e no web
+        cur.execute("UPDATE dispositivos SET firmware=%s WHERE id=%s", (fw, disp))
     try:
         motor.telemetria(cur, disp, temp, umid, corr, bat)
     except Exception as e:  # alerta nunca pode impedir a gravação da leitura
