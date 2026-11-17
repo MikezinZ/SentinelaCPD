@@ -503,7 +503,7 @@ flowchart LR
 
 | Tópico | Payload |
 | --- | --- |
-| `sentinela/<id>/telemetria` | `{"temperatura":27.8,"umidade":45.4,"corrente":0.8,"bateria":87,"rede":true}` (campos opcionais; `rede` é a fonte externa lida pelo PC817) |
+| `sentinela/<id>/telemetria` | `{"temperatura":27.8,"umidade":45.4,"corrente":0.8,"bateria":87,"rede":true,"firmware":"0.3.0"}` (campos opcionais; `rede` é a fonte externa lida pelo PC817 e `firmware` é gravado em `dispositivos.firmware`) |
 | `sentinela/<id>/evento` | `{"evento":"POWER_LOSS","estado":"ON_BATTERY","temperatura":29.4,"umidade":58.2,"bateria":87}` |
 | `esp32/telemetria` | legado da N1, sem id |
 
