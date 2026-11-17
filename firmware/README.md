@@ -39,14 +39,29 @@ Não publique `config.h`, binários com credenciais, ou a senha da etiqueta. Est
 
 Obter IP NÃO comprova acesso à internet, DNS, broker ou banco. O MVP atende Wi-Fi pessoal com senha de 8..63 bytes, não redes abertas, senha hexadecimal de 64 caracteres, WPA-Enterprise/802.1X ou login em portal de convidados. Confirme com o administrador se a rede do CPD aceita o protótipo e permite MQTT.
 
-## Recuperação e troca de rede sem botão adicional
+## Trocar Wi-Fi pelo botão BOOT
+
+1. Instale esta revisão inteira do firmware; preserve seu `config.h` privado. Se adicionou o bloco temporário `resetWifi.remove("network")` em `setup()`, remova-o: ele apagaria a rede em todo reinício.
+2. Ligue a placa normalmente e deixe o BOOT solto. Com o firmware executando, segure **somente BOOT por pelo menos 5 segundos** e solte. Não pressione EN nem ligue/reinicie segurando BOOT: no ESP32 clássico, isso pode entrar no modo de gravação.
+3. Aparecerá a rede `SentinelaCPD-<ID>`, mesmo se a rede salva estiver funcionando. Conecte com a senha `CONFIG_AP_PASSWORD` e abra **http://192.168.4.1**.
+4. Informe o novo SSID/senha de uma rede pessoal de 2,4 GHz. A rede anterior fica salva até a nova conexão obter IP. Em caso de senha incorreta ou timeout de 20 s, a tentativa anterior é restaurada e o portal manual permanece aberto para corrigir os dados.
+5. Após conectar e salvar a nova rede, o portal fecha em 15 s. Reinicie para conferir a persistência. Se não enviar configuração válida, o portal fecha ao completar 10 min e conserva a rede salva.
+
+Não é necessário desligar o roteador nem manter um computador conectado. O botão também permite abrir uma janela de diagnóstico na bateria: acompanhe `seq`, idade da amostra e sensores pelo portal. Isso não mede autonomia nem comprova uma troca de alimentação sem reinício.
+
+O portal manual não fecha só porque a rede antiga continua conectada ou voltou após uma tentativa malsucedida. Durante o portal, a coleta continua e o envio MQTT fica suspenso; não há histórico de todas as medições desse período. A janela de 10 min conta desde a abertura, mesmo se um teste de credenciais estiver pendente no fim do prazo.
+
+O botão tem debounce de 50 ms e um acionamento por pressão longa; solte antes de tentar novamente. Um botão mantido desde o início do firmware exige soltura antes de ser reconhecido. Chamadas síncronas de rede podem atrasar o reconhecimento. `CONFIG_BUTTON_PIN` usa GPIO0 por padrão (BOOT ativo em LOW, com pull-up), inclusive para `config.h` antigo sem essa opção; `-1` desativa. Se usar outro botão/GPIO, confirme a ligação e evite os pinos dos sensores e do monitoramento de energia.
+
+O portal e o ciclo OTA têm uma reserva de rede compartilhada: se uma atualização estiver em andamento, a abertura manual é recusada e a serial orienta a soltar e tentar novamente. Enquanto o portal estiver aberto, o OTA não começa. Não há interrupção forçada de uma atualização para trocar a rede.
+
+## Recuperação automática e segurança da configuração
 
 - Uma queda comum inicia reconexão sem apagar credenciais.
-- Após 60 s desconectado, abre UMA janela de portal por interrupção, de até 10 min, protegida pela senha própria da placa.
-- Se o roteador voltar e a conexão for restabelecida, o portal fecha após 15 s. O MQTT fica suspenso durante o portal; a coleta não.
-- Se o prazo terminar sem configuração, o portal fecha e a reconexão da rede salva continua. Reinicie para abrir uma nova janela se necessário.
-- Para trocar uma rede ainda funcional, torne temporariamente a rede anterior indisponível ao dispositivo (na bancada, desligue apenas o hotspot de teste), aguarde a janela e configure a nova. Não derrube a rede compartilhada do CPD para fazer isso. Se não puder isolar o dispositivo da rede anterior, a alternativa desta etapa é manutenção local por USB/abertura da case. Controle autenticado de reconfiguração pelo app é evolução futura.
-- Senha de portal esquecida exige manutenção USB para regravar `config.h`; não há senha universal de recuperação.
+- Após 60 s desconectado, abre UMA janela de recuperação por interrupção, de até 10 min, protegida pela senha própria da placa. Se um ciclo OTA ainda estiver encerrando, aguarda a liberação da reserva de rede.
+- No portal automático, se o roteador voltar e a conexão for restabelecida, o portal fecha após 15 s. Esse fechamento não ocorre só pela reconexão da rede antiga no portal aberto pelo BOOT.
+- Se o prazo terminar sem configuração, o portal fecha e a reconexão da rede salva continua. Use BOOT para abrir outra janela.
+- Senha de portal esquecida exige manutenção USB para regravar `config.h`; não há senha universal de recuperação. O BOOT não remove essa senha nem apaga as credenciais.
 - Credenciais são salvas como um único registro NVS versionado. Não são criptografadas contra leitura física da flash nesta etapa. As rotas HTTP recusam acesso pela interface da rede do CPD e exigem conexão à rede temporária; o formulário usa token de sessão. Não imprimir senhas ou devolvê-las em páginas.
 
 ## Integração com o Cloud (MQTT)
@@ -74,6 +89,10 @@ Os métodos de rede são síncronos e podem atrasar o portal/loop de rede; a ind
 
 | Teste | Como conferir | Resultado esperado |
 |---|---|---|
+| Troca com Wi-Fi funcionando | Com rede antiga conectada, segurar BOOT por 5 s e aguardar mais de 15 s | Portal continua aberto e permite cadastrar outra rede sem desligar o roteador |
+| Falha na troca manual | No portal do BOOT, enviar senha errada e aguardar a reconexão antiga | Credenciais antigas preservadas; portal continua aberto para correção |
+| Botão e reinício | Toque curto, pressão longa contínua, soltar/repetir e iniciar segurando BOOT | Toque curto ignorado; uma abertura por pressão; usar BOOT somente após iniciar, sem EN |
+| OTA em curso | Em bancada com OTA configurado, tentar BOOT durante download/gravação | Abertura recusada; OTA preservado; nova pressão após encerrar abre portal |
 | Primeira configuração | Ligar sem credenciais desta versão; acessar pelo celular | Portal protegido, leitura local com `seq` crescente e envio das credenciais |
 | Autonomia | Fonte USB, sem PC; configurar e depois reiniciar | Reconexão automática, mesmo ID e novas medições no broker |
 | Senha errada | Na janela de recuperação enviar senha incorreta | Timeout de 20 s; configuração anterior preservada, sem reboot |
@@ -93,6 +112,8 @@ Teste de energia/rede não exige alterar nem energizar o circuito de corrente de
 O teste C++ exercita validação de credenciais, registro NVS malformado, overflow de `millis`, backoff e cálculo RMS com offset, ruído e senoide conhecida:
 
 ```sh
+g++ -std=c++11 -Wall -Wextra -Werror tests/firmware/config_portal_test.cpp -o /tmp/sentinela-portal
+/tmp/sentinela-portal
 g++ -std=c++11 -Wall -Wextra -Werror tests/firmware/runtime_policy_test.cpp -o /tmp/sentinela-test
 /tmp/sentinela-test
 g++ -std=c++11 -Wall -Wextra -Werror tests/firmware/telemetry_contract_test.cpp -o /tmp/sentinela-contrato
@@ -101,7 +122,7 @@ g++ -std=c++11 -Wall -Wextra -Werror tests/firmware/telemetry_contract_test.cpp 
 
 Rode a partir da raiz do repositório. O teste não simula rádio, armazenamento NVS, DHCP, HTTP nem sensores físicos. Compilação para ESP32 e teste em bancada são verificações distintas.
 
-### Validação realizada nesta revisão
+### Validação anterior à adição do botão BOOT
 
 - Arduino CLI 1.3.1, core ESP32 3.3.12, alvo `esp32:esp32:esp32`, partições padrão e bibliotecas nas versões acima: compilação passou com `--warnings all`.
 - Uso informado pelo compilador: 945.508 bytes de aplicação (72% de 1.310.720) e 47.976 bytes de variáveis globais (14%). Isso não mede pico de heap, pilha das tarefas ou autonomia da bateria.
@@ -113,6 +134,12 @@ Para reproduzir a compilação com um `config.h` privado preparado:
 ```sh
 arduino-cli compile --fqbn esp32:esp32:esp32 --warnings all firmware
 ```
+
+## Validação da troca manual de rede
+
+A lógica de pressão longa, debounce, acionamento único, soltura após boot e overflow dos timers tem casos em `tests/firmware/config_portal_test.cpp`. O mesmo teste cobre os prazos diferentes dos portais manual e automático.
+
+Nesta alteração, foram feitas revisão estática da integração e simulação dos cenários de botão/timers em JavaScript. A simulação não substitui execução C++, compilação para ESP32 ou teste físico. Esses três passos continuam pendentes para esta revisão; as compilações e os testes registrados acima são de versões anteriores.
 
 ## Próximos incrementos
 

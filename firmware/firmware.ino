@@ -17,6 +17,11 @@
 #error "Atualize config.h pelo config.example.h: configure CONFIG_AP_PASSWORD."
 #endif
 
+// Compatibilidade com config.h já existente. BOOT é ativo em nível baixo.
+#ifndef CONFIG_BUTTON_PIN
+#define CONFIG_BUTTON_PIN 0
+#endif
+
 // Impedir confirmação automática pelo Arduino antes do teste local.
 extern "C" bool verifyRollbackLater() { return true; }
 
@@ -43,6 +48,8 @@ struct Sample {
 };
 bool storageReady = false, hasSaved = false;
 bool portalActive = false, portalTried = false, portalAllowed = false;
+bool portalManual = false;
+ConfigButton configButton;
 bool candidatePending = false, candidateStarted = false;
 bool connectionSeen = false, closeScheduled = false;
 uint32_t portalAt = 0, candidateAt = 0, wifiAttemptAt = 0;
@@ -170,8 +177,13 @@ void handleConfigure() {
 }
 
 void startPortal() {
+  if (portalActive) return;
   portalTried = true;
   if (!portalAllowed) return;
+  if (!secureOta::tryLockNetwork()) {
+    portalTried = false; // recuperação automática poderá tentar após a OTA
+    return;
+  }
   WiFi.mode(WIFI_AP_STA);
   const IPAddress ip(192, 168, 4, 1);
   if (!WiFi.softAPConfig(ip, ip, IPAddress(255,255,255,0)) ||
@@ -179,12 +191,14 @@ void startPortal() {
     Serial.println("[PORTAL] Falha ao iniciar.");
     WiFi.softAPdisconnect(true);
     WiFi.mode(WIFI_STA);
+    secureOta::unlockNetwork();
     return;
   }
   snprintf(csrf, sizeof(csrf), "%08lx%08lx%08lx%08lx",
     (unsigned long)esp_random(), (unsigned long)esp_random(),
     (unsigned long)esp_random(), (unsigned long)esp_random());
   portalActive = true;
+  portalManual = false;
   closeScheduled = false;
   portalAt = millis();
   server.begin();
@@ -192,12 +206,40 @@ void startPortal() {
 }
 
 void stopPortal() {
+  if (!portalActive) return;
   server.stop();
   WiFi.softAPdisconnect(true);
   WiFi.mode(WIFI_STA);
   portalActive = false;
+  portalManual = false;
   closeScheduled = false;
+  secureOta::unlockNetwork();
   Serial.println("[PORTAL] Encerrado. Coleta continua.");
+}
+
+void serviceConfigButton() {
+  if (CONFIG_BUTTON_PIN < 0 ||
+      !configButton.update(digitalRead(CONFIG_BUTTON_PIN) == LOW, millis())) return;
+  if (!portalAllowed) {
+    Serial.println("[PORTAL] Configure CONFIG_AP_PASSWORD antes de usar o botao.");
+    return;
+  }
+  if (candidatePending) {
+    Serial.println("[PORTAL] Aguarde o teste de rede atual; depois solte e pressione novamente.");
+    return;
+  }
+  if (!portalActive) startPortal();
+  if (!portalActive) {
+    Serial.println("[PORTAL] Indisponivel (OTA em andamento ou falha no AP); solte e tente novamente.");
+    return;
+  }
+  // Não apagar NVS nem desconectar a rede salva. Permitir troca mesmo conectado.
+  portalManual = true;
+  portalAt = millis();
+  closeScheduled = false;
+  transport.stop();
+  notice = "Troca de Wi-Fi: informe a nova rede. A anterior permanece salva ate obter IP. Portal aberto por ate 10 minutos.";
+  Serial.println("[PORTAL] Aberto pelo botao. Rede anterior preservada; janela de 10 min.");
 }
 
 void beginSavedWifi() {
@@ -234,6 +276,7 @@ void serviceWifi() {
         candidate = Credentials{};
         candidatePending = candidateStarted = false;
         notice = "Wi-Fi conectado e salvo. Portal fecha em 15 segundos. MQTT e internet sao testes separados.";
+        portalManual = false; // a nova rede foi aceita, inclusive no portal manual
         closeScheduled = true;
         closeAt = millis();
       } else {
@@ -255,7 +298,7 @@ void serviceWifi() {
     connectionSeen = true;
     offlineAt = now;
     if (!portalActive) portalTried = false;
-    if (portalActive && !closeScheduled) {
+    if (portalActive && !portalManual && !closeScheduled) {
       notice = "Rede salva reconectada. Portal fecha em 15 segundos.";
       closeScheduled = true; closeAt = now;
     }
@@ -273,8 +316,7 @@ void serviceWifi() {
     if (!candidatePending && !portalActive && !portalTried &&
         (!hasSaved || elapsed(now, offlineAt, RECOVERY_MS))) startPortal();
   }
-  if (portalActive && (elapsed(now, portalAt, PORTAL_MS) ||
-      (closeScheduled && elapsed(now, closeAt, PORTAL_SUCCESS_MS)))) {
+  if (portalActive && portalShouldClose(now, portalAt, portalManual, closeScheduled, closeAt)) {
     if (candidatePending) cancelCandidate();
     stopPortal();
   }
@@ -344,6 +386,10 @@ void serviceMqtt() {
 
 void setup() {
   Serial.begin(115200); // não aguardar monitor serial
+  if (CONFIG_BUTTON_PIN >= 0) {
+    pinMode(CONFIG_BUTTON_PIN, INPUT_PULLUP);
+    Serial.println("[PORTAL] Com o dispositivo iniciado, segure BOOT por 5 s para trocar Wi-Fi.");
+  }
   const uint64_t mac = ESP.getEfuseMac();
   snprintf(deviceId, sizeof(deviceId), "ESP32_CPD_%04X%08X",
     unsigned((mac >> 32) & 0xffff), unsigned(mac & 0xffffffff));
@@ -396,6 +442,7 @@ void setup() {
 }
 
 void loop() {
+  serviceConfigButton();
   serviceWifi();
   if (portalActive) server.handleClient();
   Sample healthSample{};

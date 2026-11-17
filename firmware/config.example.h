@@ -6,6 +6,10 @@
 #define CONFIG_AP_PASSWORD "TROQUE_ESTA_SENHA"
 
 // O Wi-Fi do local será informado pelo celular, sem regravar o firmware.
+// Após iniciar, segure BOOT por 5 s para reabrir o portal e trocar a rede.
+// GPIO0 no ESP32 clássico; botão para GND, ativo em LOW. -1 desativa.
+// config.h antigo sem esta opção usa GPIO0 automaticamente.
+#define CONFIG_BUTTON_PIN 0
 
 // --- Configurações do Broker EMQX ---
 // MQTT sem TLS SOMENTE na bancada. Não expor na internet.

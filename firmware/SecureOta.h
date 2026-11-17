@@ -17,6 +17,11 @@ namespace sentinela {
 namespace secureOta {
 static std::atomic<bool> externalPower{false}, healthy{false};
 static std::atomic<uint32_t> powerObservedAt{0};
+// Exclusão entre portal e ciclo OTA (manifesto, gravação e seleção de boot).
+// O portal conserva a reserva até fechar; nunca interromper uma atualização em curso.
+static std::atomic_flag networkLock = ATOMIC_FLAG_INIT;
+inline bool tryLockNetwork() { return !networkLock.test_and_set(); }
+inline void unlockNetwork() { networkLock.clear(); }
 static bool safePower(){return externalPower.load() && uint32_t(millis()-powerObservedAt.load())<12000;}
 static Preferences bootStore;
 static bool pendingBoot=false, storeOpen=false, watchdogReady=false;
@@ -96,13 +101,14 @@ static void worker(void*) {
   for(;;) {
     esp_task_wdt_reset();
     if(healthy.load() && safePower() && WiFi.status()==WL_CONNECTED &&
-       time(nullptr)>1767225600 && uint32_t(millis()-last)>=900000) {
+       time(nullptr)>1767225600 && uint32_t(millis()-last)>=900000 && tryLockNetwork()) {
       last=millis();String body;Release release;
       const esp_partition_t* slot=esp_ota_get_next_update_partition(nullptr);
       if(slot && fetchManifest(body) && releasePolicy(body.c_str(),OTA_RELEASE_PREFIX,FIRMWARE_SEQUENCE,
           db.getUInt("floor",0),db.getUInt("rejected",0),slot->size,release) && signatureValid(release)) {
         if(!install(release,db))Serial.println("[OTA] Atualizacao abortada; aplicacao atual preservada.");
       } else Serial.println("[OTA] Sem release elegivel/verificavel.");
+      unlockNetwork();
     }
     delay(1000);
   }
