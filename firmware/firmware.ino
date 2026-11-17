@@ -316,6 +316,7 @@ void serviceWifi() {
     if (!candidatePending && !portalActive && !portalTried &&
         (!hasSaved || elapsed(now, offlineAt, RECOVERY_MS))) startPortal();
   }
+  now = millis(); // startPortal() pode ter atualizado portalAt depois do "now" acima
   if (portalActive && portalShouldClose(now, portalAt, portalManual, closeScheduled, closeAt)) {
     if (candidatePending) cancelCandidate();
     stopPortal();
@@ -371,9 +372,9 @@ void serviceMqtt() {
     publishedSeq = sample.seq;
     Serial.println("[MQTT] Amostra invalida; envio legado omitido."); return;
   }
-  char payload[160];
+  char payload[200];
   const int count = buildTelemetry(payload, sizeof(payload), sample.temperature, sample.humidity,
-    sample.current, battery, sample.externalPower);
+    sample.current, battery, sample.externalPower, FIRMWARE_VERSION);
   if (count > 0 && size_t(count) < sizeof(payload)) {
     publishedSeq = sample.seq; // QoS 0; sem ACK de banco ou replay nesta etapa
     if (!mqtt.publish(telemetryTopic, payload, false)) {
