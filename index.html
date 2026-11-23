@@ -1,351 +1,163 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Projeto SentinelaCPD • Telemetria e Monitoramento de CPD</title>
-
-    <!-- Ícones e Biblioteca de Gráficos -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-    <!-- Folha de Estilo Customizada -->
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="SentinelaCPD: projeto acadêmico de monitoramento ambiental e de corrente com ESP32, MQTT, plataforma de dados e aplicativo. Conheça a implementação e as validações pendentes.">
+  <meta name="theme-color" content="#059669">
+  <title>SentinelaCPD • Dispositivo, plataforma e aplicativo</title>
+  <link rel="stylesheet" href="style.css?v=20261123">
+  <script src="script.js?v=20261123" defer></script>
 </head>
-
 <body>
+  <a class="skip-link" href="#conteudo">Ir para o conteúdo</a>
+  <header class="navbar">
+    <div class="nav-container">
+      <a class="brand" href="#home" aria-label="SentinelaCPD — início">
+        <span class="brand-mark" aria-hidden="true">S</span>
+        <span class="brand-text"><span class="brand-title">SENTINELACPD</span><span class="brand-subtitle">Monitoramento de infraestrutura</span></span>
+      </a>
+      <nav class="nav-menu" aria-label="Navegação principal">
+        <a href="#home" class="nav-link active" aria-current="location">Home</a>
+        <a href="#plataforma" class="nav-link">Plataforma</a>
+        <a href="#dispositivo" class="nav-link">Dispositivos</a>
+        <a href="#aplicativo" class="nav-link">Aplicativo</a>
+      </nav>
+    </div>
+  </header>
 
-    <!-- Cabeçalho e Menu Superior Padronizado -->
-    <header class="navbar">
-        <div class="nav-container">
-            <div class="brand">
-                <i class="fa-solid fa-server brand-icon"></i>
-                <div class="brand-text">
-                    <span class="brand-title">PROJETO SENTINELACPD</span>
-                    <span class="brand-subtitle">Monitoramento de Infraestrutura Crítica</span>
-                </div>
-            </div>
-            <nav class="nav-menu">
-                <a href="#home" class="nav-link active">Home</a>
-                <a href="#plataforma" class="nav-link">Plataforma</a>
-                <a href="#dispositivo" class="nav-link">Dispositivos</a>
-                <a href="#aplicativo" class="nav-link">Aplicativo</a>
-            </nav>
+  <main id="conteudo">
+    <section id="home" class="section">
+      <div class="container">
+        <div class="badge-status">Projeto Integrador 6 • Evolução N2</div>
+        <h1 class="main-title">Do ambiente do CPD<br>à informação para agir.</h1>
+        <p class="section-lead">Temperatura, umidade e corrente elétrica coletadas no ESP32, enviadas por MQTT e organizadas em uma plataforma com histórico, alertas e acesso pelo aplicativo.</p>
+        <div class="hero-actions">
+          <a class="button-primary" href="#dispositivo">Conheça o dispositivo</a>
+          <a class="button-secondary" href="https://github.com/MikezinZ/SentinelaCPD" target="_blank" rel="noopener noreferrer">Explore o repositório ↗</a>
         </div>
-    </header>
-
-    <main>
-        <!-- 1. HOME -->
-        <section id="home" class="section">
-            <div class="container">
-                <div class="badge-status">
-                    <span class="badge-dot"></span> Projeto Integrador 6 • N1 — Validação de Bancada
-                </div>
-
-                <h1 class="main-title">Telemetria Climática e Continuidade Energética para CPDs</h1>
-                <p class="section-lead">
-                    Sistema IoT ponta a ponta para contenção de hotspots térmicos e auditoria contínua de demanda de
-                    corrente alternada em Centros de Processamento de Dados. Solução resiliente com processamento na
-                    borda, mensageria MQTT industrial e banco de dados relacional.
-                </p>
-
-                <div class="cards-grid three-cols">
-                    <div class="card">
-                        <div class="card-icon"><i class="fa-solid fa-temperature-arrow-up"></i></div>
-                        <h3>Microclima em Tempo Real</h3>
-                        <p>Monitoramento contínuo de temperatura e umidade relativa do ar via sensor digital DHT22 em
-                            conformidade com as normas operacionais da ASHRAE.</p>
-                    </div>
-                    <div class="card">
-                        <div class="card-icon"><i class="fa-solid fa-bolt-lightning"></i></div>
-                        <h3>Cálculo RMS Discreto</h3>
-                        <p>Medição de corrente alternada com sensor toroidal ZMCT103C, monitorando a rede de 60 Hz em
-                            janelas de
-                            200 ms para obter o valor eficaz real (RMS).</p>
-                    </div>
-                    <div class="card">
-                        <div class="card-icon"><i class="fa-solid fa-shield-halved"></i></div>
-                        <h3>Pipeline Local-First</h3>
-                        <p>Infraestrutura conteinerizada em Docker (EMQX + MySQL) que assegura privacidade, imunidade a
-                            quedas de link externo e baixa latência.</p>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- 2. PLATAFORMA -->
-        <section id="plataforma" class="section section-alt">
-            <div class="container">
-                <div class="section-header">
-                    <h2 class="section-title">Plataforma IoT e Arquitetura de Dados</h2>
-                    <p class="section-subtitle">Integração entre o nó embarcado e a persistência relacional através de
-                        mensageria assíncrona.</p>
-                </div>
-
-                <div class="evidence-card">
-                    <div class="evidence-image-wrapper">
-                        <img src="images/diagrama_sistema.png" alt="Diagrama completo do sistema" class="evidence-img">
-                    </div>
-                    <div class="evidence-caption">
-                        <h4>Diagrama completo do sistema</h4>
-                        <p>Sensores, processamento no ESP32, MQTT, integração EMQX/MySQL e auditoria na N1.</p>
-                    </div>
-                </div>
-
-                <div class="pipeline-card">
-                    <h3>Fluxo da Arquitetura de Ingestão</h3>
-                    <div class="pipeline-steps">
-                        <div class="step-box">
-                            <span class="step-badge">1. Borda</span>
-                            <strong>ESP32 MCU</strong>
-                            <small>Amostragem & RMS</small>
-                        </div>
-                        <i class="fa-solid fa-arrow-right step-arrow"></i>
-                        <div class="step-box">
-                            <span class="step-badge">2. Transporte</span>
-                            <strong>MQTT 1883</strong>
-                            <small>Payload JSON</small>
-                        </div>
-                        <i class="fa-solid fa-arrow-right step-arrow"></i>
-                        <div class="step-box">
-                            <span class="step-badge">3. Broker</span>
-                            <strong>EMQX 5.x</strong>
-                            <small>Rule Engine SQL</small>
-                        </div>
-                        <i class="fa-solid fa-arrow-right step-arrow"></i>
-                        <div class="step-box">
-                            <span class="step-badge">4. Banco</span>
-                            <strong>MySQL 8.0</strong>
-                            <small>iot_db (Tabela)</small>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="cards-grid two-cols">
-                    <div class="card">
-                        <div class="card-badge">Mensageria</div>
-                        <h3>Broker MQTT (EMQX 5.x)</h3>
-                        <ul class="feature-list">
-                            <li><i class="fa-solid fa-check"></i> Broker industrial operando em contêiner Docker na
-                                porta <code>1883</code>.</li>
-                            <li><i class="fa-solid fa-check"></i> Autenticação por credenciais (<code>esp32_cpd</code>)
-                                no tópico <code>esp32/telemetria</code>.</li>
-                            <li><i class="fa-solid fa-check"></i> Rule Engine SQL interno que extrai campos do payload
-                                sem necessidade de backends intermediários.</li>
-                            <li><i class="fa-solid fa-check"></i> Conector Data Bridge com inserção direta assíncrona no
-                                MySQL.</li>
-                        </ul>
-                    </div>
-
-                    <div class="card">
-                        <div class="card-badge">Persistência</div>
-                        <h3>Banco de Dados (MySQL 8.0)</h3>
-                        <ul class="feature-list">
-                            <li><i class="fa-solid fa-check"></i> Schema relacional <code>iot_db</code> configurado com
-                                volumes persistentes.</li>
-                            <li><i class="fa-solid fa-check"></i> Tabela <code>leituras_dht22</code> contendo métricas
-                                de clima, corrente e timestamp sincronizado.</li>
-                            <li><i class="fa-solid fa-check"></i> Auditoria e validação via MySQL Workbench através da
-                                porta local <code>3306</code>.</li>
-                            <li><i class="fa-solid fa-check"></i> Preparado para indexação analítica e consultas
-                                temporais da etapa N2.</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- 3. DISPOSITIVO -->
-        <section id="dispositivo" class="section">
-            <div class="container">
-                <div class="section-header">
-                    <h2 class="section-title">Dispositivos de Borda e Circuito</h2>
-                    <p class="section-subtitle">Conexões físicas, barramentos de energia e ensaio experimental em
-                        bancada.</p>
-                </div>
-
-                <!-- Evidência da Bancada (Foto adicionada) -->
-                <div class="evidence-card">
-                    <div class="evidence-image-wrapper">
-                        <img src="images/esquematico_circuito.png" alt="Circuito eletrônico e elétrico"
-                            class="evidence-img">
-                    </div>
-                    <div class="evidence-caption">
-                        <h4>Circuito eletrônico e elétrico</h4>
-                        <p>Interligação dos módulos e circuito AC monitorado. Os níveis lógicos devem respeitar os
-                            limites do ESP32; consulte a pinagem.</p>
-                    </div>
-                </div>
-
-                <div class="evidence-card">
-                    <div class="evidence-image-wrapper">
-                        <img src="images/bancada_teste.jpg" alt="Montagem física da bancada de testes SentinelaCPD"
-                            class="evidence-img">
-                    </div>
-                    <div class="evidence-caption">
-                        <h4>Bancada de Ensaios com Carga Ativa</h4>
-                        <p>
-                            Montagem experimental isolada: microcontrolador ESP32 DevKit v1, DHT22 (GPIO 27) para
-                            sensoriamento térmico e ZMCT103C (GPIO 34) monitorando indutivamente o condutor Fase da
-                            lâmpada de teste em rede de 220V AC sem contato galvânico direto com o circuito lógico.
-                        </p>
-                    </div>
-                </div>
-
-                <div class="table-wrapper">
-                    <table class="tech-table">
-                        <thead>
-                            <tr>
-                                <th>Componente</th>
-                                <th>Pino Físico</th>
-                                <th>Pino ESP32</th>
-                                <th>Interface Elétrica</th>
-                                <th>Descrição Técnica</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><strong>Sensor DHT22</strong></td>
-                                <td>DAT</td>
-                                <td><code>GPIO 27</code></td>
-                                <td>Digital Single-Bus</td>
-                                <td>Leitura de temperatura e umidade a cada 5 segundos</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Sensor ZMCT103C</strong></td>
-                                <td>OUT</td>
-                                <td><code>GPIO 34</code></td>
-                                <td>Analógico (ADC1)</td>
-                                <td>Leitura RMS com offset central; imune a ruídos do rádio Wi-Fi</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Alimentação Lógica</strong></td>
-                                <td>VCC / GND</td>
-                                <td><code>5V / GND</code></td>
-                                <td>Barramento DC</td>
-                                <td>Distribuído pelas calhas laterais (+) e (-) da protoboard</td>
-                            </tr>
-                            <tr>
-                                <td><strong>Carga AC (220V)</strong></td>
-                                <td>Fase Única</td>
-                                <td>Orifício Toroidal</td>
-                                <td>Acoplamento Magnético</td>
-                                <td>Isolamento galvânico total sem contato elétrico com a placa</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-
-                <div class="callout-card">
-                    <i class="fa-solid fa-circle-info callout-icon"></i>
-                    <div>
-                        <h4>Fundamentação Matemática da Corrente RMS</h4>
-                        <p>
-                            Por se tratar de corrente alternada em 60 Hz, o sinal oscila em torno de um offset DC (~1680
-                            no conversor analógico de 12 bits). O ESP32 realiza amostragem contínua durante 200 ms,
-                            calcula o desvio quadrático médio em relação ao valor médio e aplica o fator de calibração
-                            empírico, zerando leituras com desvio abaixo de 18.0 para suprimir o ruído térmico em
-                            repouso.
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- 4. APLICATIVO -->
-        <section id="aplicativo" class="section section-alt">
-            <div class="container">
-                <div class="section-header">
-                    <h2 class="section-title">Aplicativo e Camada de Apresentação</h2>
-                    <p class="section-subtitle">Resultados práticos registrados na bancada N1 e projeções para o
-                        dashboard N2.</p>
-                </div>
-
-                <!-- Evidência do Workbench (Foto adicionada) -->
-                <div class="evidence-card">
-                    <div class="evidence-image-wrapper">
-                        <img src="images/workbench_log.png" alt="Registros de telemetria no MySQL Workbench"
-                            class="evidence-img">
-                    </div>
-                    <div class="evidence-caption">
-                        <h4>Auditoria em Banco de Dados (MySQL Workbench)</h4>
-                        <p>
-                            Registros no banco <code>iot_db</code> comprovando a transição de repouso
-                            (<code>0.01 A</code>) para regime ativo estável (<code>0.08 A</code>), com monitoramento
-                            térmico constante a <code>24.3 °C</code> e <code>~57%</code> de umidade em intervalos de 5
-                            segundos.
-                        </p>
-                    </div>
-                </div>
-
-                <div class="cards-grid two-cols mb-lg">
-                    <div class="card">
-                        <div class="card-badge success">Validação de Bancada N1</div>
-                        <h3>Métricas de Ensaio</h3>
-                        <p>Comportamento elétrico e ambiental validado sob carga real com taxa de amostragem
-                            determinística e sincronização temporal.</p>
-                        <div class="stats-preview">
-                            <div class="stat-item">
-                                <span class="stat-label">Piso Repouso</span>
-                                <span class="stat-value">0.01 A</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-label">Carga Ativa</span>
-                                <span class="stat-value">0.08 A</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-label">Temperatura</span>
-                                <span class="stat-value">24.3 °C</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="card">
-                        <div class="card-badge info">Em Desenvolvimento N2</div>
-                        <h3>Dashboard Web SPA & Notificações</h3>
-                        <p>O ecossistema será expandido com um painel progressivo em tempo real conectado via
-                            WebSockets, integrando cálculo de consumo acumulado em kWh e notificações automáticas de
-                            incidentes térmicos.</p>
-                        <div class="tags-container">
-                            <span class="tag">Chart.js</span>
-                            <span class="tag">WebSockets</span>
-                            <span class="tag">Estimativa kWh</span>
-                            <span class="tag">Alertas ASHRAE</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Demonstração Gráfica com Chart.js -->
-                <div class="chart-card">
-                    <div class="chart-header">
-                        <h3>Série Temporal: Ensaio de Bancada com Transição de Carga</h3>
-                        <span class="chart-badge">Dados Reais Registrados</span>
-                    </div>
-                    <div class="chart-container">
-                        <canvas id="telemetriaChart"></canvas>
-                    </div>
-                </div>
-            </div>
-        </section>
-    </main>
-
-    <!-- Rodapé Institucional -->
-    <footer class="footer">
-        <div class="container footer-content">
-            <div>
-                <strong>SentinelaCPD</strong> • Projeto Integrador 6 (2026.2)
-            </div>
-            <div class="repo-link">
-                <a href="https://github.com/MikezinZ/SentinelaCPD" target="_blank" rel="noopener noreferrer">
-                    <i class="fa-brands fa-github"></i> Ver Código no GitHub
-                </a>
-            </div>
+        <dl class="project-metrics">
+          <div><dt>5 s</dt><dd>Intervalo nominal de coleta</dd></div>
+          <div><dt>200 ms</dt><dd>Janela de cálculo de corrente RMS</dd></div>
+          <div><dt>0.3.0</dt><dd>Versão padrão no código do firmware</dd></div>
+        </dl>
+        <div class="section-header compact">
+          <h2 class="section-title">O projeto hoje</h2>
+          <p class="section-subtitle">Implementação, evidências e próximos ensaios apresentados separadamente.</p>
         </div>
-    </footer>
+        <div class="cards-grid three-cols">
+          <article class="card"><span class="card-badge success">Implementado no repositório</span><h3>Dispositivo e plataforma</h3><p>Coleta em tarefa própria, portal Wi-Fi, reconexão, contrato MQTT por dispositivo, ingestão, API, aplicativo móvel e dashboard web.</p></article>
+          <article class="card"><span class="card-badge info">Evidência de bancada</span><h3>Leituras registradas</h3><p>A N1 documenta ensaios com cargas LED e registros no MySQL. Há confirmação de leitura de temperatura e umidade e reconexão à rede salva nos testes de desenvolvimento.</p></article>
+          <article class="card"><span class="card-badge pending">Validação pendente</span><h3>Bateria e atualização remota</h3><p>Continuidade e autonomia da bateria, circuito de monitoramento da fonte, calibração e OTA com recuperação precisam de ensaios integrados na placa.</p></article>
+        </div>
+        <p class="page-note">Página de apresentação do projeto. Os registros de bancada abaixo são históricos; este site não recebe telemetria ao vivo. Atualizado em <time datetime="2026-11-23">23 de novembro de 2026</time>.</p>
+        <a class="text-link" href="images/banner_sentinelacpd.jpg" target="_blank" rel="noopener noreferrer">Abrir o banner do projeto ↗</a>
+      </div>
+    </section>
 
-    <!-- Script de Comportamento e Gráficos -->
-    <script src="script.js"></script>
+    <section id="plataforma" class="section section-alt">
+      <div class="container">
+        <div class="section-header"><span class="eyebrow">01 / Plataforma</span><h2 class="section-title">Da mensagem ao histórico.</h2><p class="section-subtitle">A arquitetura atual usa um serviço de ingestão entre o broker e o banco de dados.</p></div>
+        <div class="pipeline-card">
+          <h3>Fluxo atual de dados</h3>
+          <ol class="architecture-flow">
+            <li><span>01</span><strong>ESP32</strong><small>Sensores e RMS</small></li>
+            <li><span>02</span><strong>EMQX</strong><small>Mensagens MQTT</small></li>
+            <li><span>03</span><strong>Ingestor</strong><small>Validação em Python</small></li>
+            <li><span>04</span><strong>MySQL</strong><small>Leituras e incidentes</small></li>
+            <li><span>05</span><strong>API + interfaces</strong><small>App e dashboard</small></li>
+          </ol>
+          <p class="page-note">Serviços executáveis com Docker Compose em um servidor da rede local. Uma implantação remota depende de hospedagem, acesso de rede e configuração de segurança.</p>
+        </div>
+        <div class="cards-grid two-cols mb-lg">
+          <article class="card"><span class="card-badge">Mensageria e ingestão</span><h3>Identidade por dispositivo</h3><p>O ID fixo do ESP32 compõe o tópico MQTT. O ingestor valida os campos e grava as leituras, a versão do firmware e os eventos recebidos.</p><ul class="plain-list"><li><code>sentinela/&lt;id&gt;/telemetria</code></li><li><code>sentinela/&lt;id&gt;/evento</code></li><li>Compatibilidade com o tópico legado da N1.</li></ul></article>
+          <article class="card"><span class="card-badge">Dados e operação</span><h3>Histórico, API e alertas</h3><p>MySQL mantém dispositivos, leituras, eventos, incidentes e alertas. A API FastAPI fornece acesso às interfaces; um serviço de notificações integra os alertas ao Telegram.</p><p class="card-note">O backend recebe eventos de falta e retorno de fonte. Sua geração no equipamento depende do circuito de detecção configurado.</p></article>
+        </div>
+        <div class="callout-card"><div><h3>Wi-Fi conectado não significa dados entregues</h3><p>A conexão à rede local, o acesso ao broker e a gravação no banco são etapas distintas. O firmware publica em QoS 0; o retorno de publicação não confirma persistência no MySQL. MQTT sem TLS é destinado à bancada; o transporte TLS opcional exige configuração do broker, certificados e credenciais.</p></div></div>
+        <details class="reference-details">
+          <summary>Ver diagrama e documentação da etapa N1</summary>
+          <figure class="evidence-card"><div class="evidence-image-wrapper"><img src="images/diagrama_sistema.png" alt="Diagrama histórico da arquitetura N1 com integração entre EMQX e MySQL" class="evidence-img" loading="lazy"></div><figcaption class="evidence-caption"><h3>Arquitetura histórica — N1</h3><p>O diagrama registra a integração antiga por Data Bridge. O fluxo atual, apresentado acima, utiliza o ingestor Python, a API e as interfaces.</p></figcaption></figure>
+        </details>
+        <a class="text-link" href="https://github.com/MikezinZ/SentinelaCPD#cloud-ingestão-api-e-alertas-n2" target="_blank" rel="noopener noreferrer">Consultar a documentação da plataforma ↗</a>
+      </div>
+    </section>
+
+    <section id="dispositivo" class="section">
+      <div class="container">
+        <div class="section-header"><span class="eyebrow">02 / Dispositivos</span><h2 class="section-title">Coleta autônoma na borda.</h2><p class="section-subtitle">O firmware executa no ESP32 sem exigir um computador conectado durante a operação.</p></div>
+        <div class="cards-grid two-cols mb-lg">
+          <article class="card"><span class="card-badge success">Firmware</span><h3>Coleta separada da comunicação</h3><p>Uma tarefa FreeRTOS produz amostras a cada 5 segundos. Outra parte do programa atende Wi-Fi, portal e MQTT. As tentativas de conexão não são pré-condição para coletar sensores.</p><p class="card-note">A fila mantém somente a última amostra. Ainda não há histórico persistente das medições offline.</p></article>
+          <article class="card"><span class="card-badge info">Configuração local</span><h3>Troca de Wi-Fi pelo celular</h3><p>Com o firmware iniciado, segurar BOOT por pelo menos 5 segundos reabre o portal protegido. A rede anterior permanece salva até a nova conectar e obter IP.</p><p class="card-note">Função implementada; exige validação na placa. Use BOOT após iniciar, sem pressionar EN junto.</p></article>
+        </div>
+        <div class="setup-panel">
+          <h3>Como configurar a rede</h3>
+          <ol class="setup-steps"><li>Abra o portal pelo BOOT ou ligue o dispositivo sem rede cadastrada.</li><li>Conecte à rede <strong>SentinelaCPD-…</strong> com a senha própria do dispositivo.</li><li>Acesse <strong>http://192.168.4.1</strong> e informe o Wi-Fi de 2,4 GHz com senha pessoal.</li><li>Aguarde o teste de conexão. Após salvar, o portal fecha em 15 segundos.</li></ol>
+          <p>A janela dura até 10 minutos. Após cerca de 60 segundos sem Wi-Fi, o firmware tenta abrir o portal de recuperação. Durante a configuração, a coleta continua e o envio MQTT fica suspenso. O cadastro atual não implementa login corporativo ou portal de convidados.</p>
+        </div>
+        <div class="table-wrapper"><table class="tech-table"><caption>Componentes e funções no firmware atual</caption><thead><tr><th>Componente</th><th>Conexão</th><th>Função e limite</th></tr></thead><tbody>
+          <tr><th scope="row">DHT22</th><td>GPIO 27</td><td>Temperatura e umidade relativa.</td></tr>
+          <tr><th scope="row">ZMCT103C</th><td>GPIO 34 / ADC1</td><td>Corrente RMS com remoção de offset e limiar de ruído; requer calibração.</td></tr>
+          <tr><th scope="row">BOOT</th><td>GPIO 0 por padrão</td><td>Pressão longa para abrir a configuração, sem apagar a rede salva.</td></tr>
+          <tr><th scope="row">Bateria 18650</th><td>Suporte e alimentação da placa</td><td>Continuidade, alimentação dos sensores e autonomia a validar.</td></tr>
+          <tr><th scope="row">Monitoramento de energia</th><td>GPIOs opcionais</td><td>Tensão da bateria e fonte externa exigem circuitos próprios; desativados no exemplo.</td></tr>
+        </tbody></table></div>
+        <div class="callout-card mb-lg"><div><h3>Processamento do sinal de corrente</h3><p>O cálculo RMS usa a variação do sinal em relação à média de uma janela de 200 ms e aplica um fator de calibração. Abaixo de 18 unidades ADC de RMS, a leitura é zerada para reduzir o piso de ruído. Isso é processamento de sinal, sem modelo de IA embarcado nesta versão. Corrente zero não comprova falta de tensão, e a medição não fornece diretamente potência ou consumo em kWh.</p></div></div>
+        <div class="cards-grid two-cols mb-lg">
+          <article class="card"><span class="card-badge pending">Energia • a validar</span><h3>Continuidade e eventos de fonte</h3><p>O código prepara a leitura de tensão e os eventos <code>POWER_LOSS</code> e <code>POWER_RESTORED</code>. São necessários um sinal condicionado de presença de fonte e um circuito adequado de medição da bateria.</p><p class="card-note">No exemplo, os pinos estão em −1 e os dados saem como indisponíveis. O percentual, quando habilitado, é uma estimativa linear, não autonomia garantida. A fila de até quatro eventos é volátil.</p></article>
+          <article class="card"><span class="card-badge pending">OTA • preparação</span><h3>Atualização com verificação</h3><p>Implementação por HTTPS, manifesto assinado com RSA, integridade SHA-256 e gravação no slot inativo. A nova aplicação passa por teste local, com retorno à anterior previsto pelo bootloader com rollback.</p><p class="card-note">OTA desativado no exemplo: faltam configurar hospedagem, certificados, chave pública e detecção de fonte, além de validar atualização e recuperação na placa. Atualização exige alimentação externa confirmada.</p></article>
+        </div>
+        <p class="page-note">Reconexão MQTT com espera progressiva e watchdog foram implementados. Abertura do portal e ciclo OTA são coordenados para evitar execução simultânea. Esses mecanismos não substituem testes integrados de falha.</p>
+        <div class="document-links">
+          <a href="https://github.com/MikezinZ/SentinelaCPD/tree/main/firmware" target="_blank" rel="noopener noreferrer">Firmware e instruções ↗</a>
+          <a href="https://github.com/MikezinZ/SentinelaCPD/blob/main/firmware/OTA_E_ENERGIA.md" target="_blank" rel="noopener noreferrer">Preparação de OTA e energia ↗</a>
+          <a href="https://github.com/MikezinZ/SentinelaCPD/tree/main/tests/firmware" target="_blank" rel="noopener noreferrer">Testes de lógica ↗</a>
+        </div>
+        <details class="reference-details"><summary>Ver circuito e montagem da bancada N1</summary>
+          <figure class="evidence-card"><div class="evidence-image-wrapper"><img src="images/esquematico_circuito.png" alt="Esquemático histórico do circuito eletrônico e da carga monitorada na N1" class="evidence-img" loading="lazy"></div><figcaption class="evidence-caption"><h3>Circuito da etapa N1</h3><p>Referência histórica de montagem. A configuração de energia e bateria da revisão atual requer circuito e níveis elétricos validados para o ESP32.</p></figcaption></figure>
+          <figure class="evidence-card"><div class="evidence-image-wrapper"><img src="images/bancada_teste.jpg" alt="Protótipo SentinelaCPD na bancada com os sensores e a carga do ensaio N1" class="evidence-img" loading="lazy"></div><figcaption class="evidence-caption"><h3>Montagem de ensaio — N1</h3><p>Registro da bancada usada para observar a resposta do sensor de corrente a uma carga LED. Não representa validação da alimentação por bateria ou de uma instalação em CPD.</p></figcaption></figure>
+        </details>
+      </div>
+    </section>
+
+    <section id="aplicativo" class="section section-alt">
+      <div class="container">
+        <div class="section-header"><span class="eyebrow">03 / Aplicativo</span><h2 class="section-title">Dados para acompanhar e decidir.</h2><p class="section-subtitle">Aplicativo móvel em React Native/Expo e dashboard web em React, com contrato de API compartilhado.</p></div>
+        <div class="cards-grid three-cols mb-lg">
+          <article class="card"><span class="card-badge">Acompanhamento</span><h3>Dispositivos e histórico</h3><p>Consulta das métricas, atualização das leituras e histórico com agregações. Estados de dado recente, antigo ou indisponível ajudam a interpretar o que está sendo exibido.</p></article>
+          <article class="card"><span class="card-badge">Operação</span><h3>Alertas e incidentes</h3><p>Alertas por limites configurados, reconhecimento com nota e consulta de incidentes de energia. Limites são regras do servidor; não são enviados ao ESP32 nesta versão.</p></article>
+          <article class="card"><span class="card-badge">Acesso</span><h3>Login e permissões</h3><p>Perfis de administrador, operador e visualizador, com controle de ações na API. Esse login é independente da senha do portal Wi-Fi do dispositivo.</p></article>
+        </div>
+        <div class="callout-card mb-lg"><div><h3>Demonstração e dados do equipamento são modos diferentes</h3><p>Os exemplos de configuração do app e do dashboard ativam dados simulados. Para mostrar telemetria real, é necessário desativar os mocks, apontar para uma API acessível e conferir a chegada de leituras novas. Este GitPage apresenta o projeto; ele não hospeda a API nem executa o aplicativo.</p></div></div>
+        <div class="document-links">
+          <a href="https://github.com/MikezinZ/SentinelaCPD/tree/main/mobile" target="_blank" rel="noopener noreferrer">Aplicativo móvel e execução ↗</a>
+          <a href="https://github.com/MikezinZ/SentinelaCPD/tree/main/web" target="_blank" rel="noopener noreferrer">Dashboard web e execução ↗</a>
+          <a href="https://github.com/MikezinZ/SentinelaCPD/tree/main/api" target="_blank" rel="noopener noreferrer">API da plataforma ↗</a>
+        </div>
+
+        <div class="section-header evidence-heading"><h2 class="section-title">Evidência de bancada</h2><p class="section-subtitle">Recorte histórico da N1, em 2 de outubro de 2026. Não é transmissão ao vivo nem ensaio de precisão.</p></div>
+        <div class="chart-card">
+          <div class="chart-header"><h3>Resposta de corrente à ativação da carga</h3><span class="chart-badge">Histórico • N1</span></div>
+          <svg class="history-chart" viewBox="0 0 800 260" role="img" aria-labelledby="chart-title chart-description">
+            <title id="chart-title">Corrente registrada no ensaio N1</title>
+            <desc id="chart-description">A corrente passou de 0,01 ampère em repouso, por 0,03 ampère na transição, e chegou a 0,08 ampère com a carga ligada. O espaçamento horizontal representa a ordem das oito amostras selecionadas, não uma escala uniforme de tempo. Os horários estão na tabela abaixo.</desc>
+            <g stroke="#e2e8f0"><path d="M65 35H760 M65 115H760 M65 195H760"/></g>
+            <g fill="#475569" font-size="14"><text x="10" y="40">0,10 A</text><text x="10" y="120">0,05 A</text><text x="10" y="200">0,00 A</text><text x="65" y="240">Repouso</text><text x="325" y="240">Transição</text><text x="675" y="240">Carga ativa</text></g>
+            <polyline points="75,179 170,179 265,179 360,147 455,67 550,67 645,67 740,67" fill="none" stroke="#059669" stroke-width="4" stroke-linejoin="round"/>
+            <g fill="#059669"><circle cx="75" cy="179" r="5"/><circle cx="170" cy="179" r="5"/><circle cx="265" cy="179" r="5"/><circle cx="360" cy="147" r="5"/><circle cx="455" cy="67" r="5"/><circle cx="550" cy="67" r="5"/><circle cx="645" cy="67" r="5"/><circle cx="740" cy="67" r="5"/></g>
+          </svg>
+          <p class="page-note">Amostras selecionadas em ordem cronológica; o eixo horizontal indica a sequência, sem escala temporal uniforme.</p>
+          <details class="reference-details"><summary>Consultar os oito registros do gráfico</summary>
+            <div class="table-wrapper"><table class="tech-table"><caption>Amostras históricas de 02/10/2026</caption><thead><tr><th>Horário</th><th>Temperatura (°C)</th><th>Corrente (A)</th></tr></thead><tbody>
+              <tr><td>00:05:00</td><td>24,3</td><td>0,01</td></tr><tr><td>00:05:15</td><td>24,3</td><td>0,01</td></tr><tr><td>00:05:25</td><td>24,3</td><td>0,01</td></tr><tr><td>00:05:30</td><td>24,3</td><td>0,03</td></tr><tr><td>00:05:35</td><td>24,3</td><td>0,08</td></tr><tr><td>00:05:50</td><td>24,3</td><td>0,08</td></tr><tr><td>00:06:05</td><td>24,2</td><td>0,08</td></tr><tr><td>00:06:15</td><td>24,2</td><td>0,08</td></tr>
+            </tbody></table></div>
+          </details>
+        </div>
+        <details class="reference-details"><summary>Ver registro original no MySQL Workbench</summary>
+          <figure class="evidence-card"><div class="evidence-image-wrapper"><img src="images/workbench_log.png" alt="Captura histórica das leituras de temperatura, umidade e corrente no MySQL Workbench" class="evidence-img" loading="lazy"></div><figcaption class="evidence-caption"><h3>Persistência das leituras na N1</h3><p>Registro documentado no repositório. Os valores descrevem o ensaio da época e não garantem precisão metrológica, ausência de perdas ou o estado atual do equipamento.</p></figcaption></figure>
+        </details>
+      </div>
+    </section>
+  </main>
+  <footer class="footer"><div class="container footer-content"><div><strong>SentinelaCPD</strong> • Projeto Integrador 6 • 2026.2<br><small>Protótipo acadêmico em desenvolvimento e validação.</small></div><a class="text-link" href="https://github.com/MikezinZ/SentinelaCPD" target="_blank" rel="noopener noreferrer">Código e documentação no GitHub ↗</a></div></footer>
 </body>
-
 </html>
