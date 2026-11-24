@@ -22,6 +22,7 @@
         <a href="#plataforma" class="nav-link">Plataforma</a>
         <a href="#dispositivo" class="nav-link">Dispositivos</a>
         <a href="#aplicativo" class="nav-link">Aplicativo</a>
+        <a href="#principios" class="nav-link">Princípios</a>
         <a href="#tecnologias" class="nav-link">Tecnologias</a>
       </nav>
     </div>
@@ -167,9 +168,28 @@
       </div>
     </section>
 
+    <section id="principios" class="section section-alt">
+      <div class="container">
+        <div class="section-header"><span class="eyebrow">04 / Princípios</span><h2 class="section-title">Como pensamos o sistema.</h2><p class="section-subtitle">Decisões que guiaram o projeto, e o que a segurança cobre hoje e o que ainda falta.</p></div>
+        <div class="cards-grid three-cols mb-lg">
+          <article class="card"><span class="card-badge">Local-first</span><h3>Os dados ficam no CPD</h3><p>Broker, banco, API e alertas rodam no servidor local. Sem internet, a coleta e os alertas continuam funcionando.</p></article>
+          <article class="card"><span class="card-badge">Privacidade</span><h3>Mede o ambiente, não pessoas</h3><p>Temperatura, umidade e corrente não são dados pessoais. De usuários, guardamos só nome e e-mail, com senha em hash (PBKDF2).</p></article>
+          <article class="card"><span class="card-badge">Explicabilidade</span><h3>Alertas que o operador entende</h3><p>Regras com faixa ASHRAE, histerese e leituras seguidas. Cada alerta diz a métrica e o motivo; por isso não usamos IA nesta versão.</p></article>
+          <article class="card"><span class="card-badge">Acessibilidade</span><h3>Estado nunca só por cor</h3><p>App e dashboard usam texto ("Recente", "Desatualizado", "Em bateria") e ícones; o LED na case dá retorno no próprio rack.</p></article>
+          <article class="card"><span class="card-badge">Falha segura</span><h3>Degradar sem perder o controle</h3><p>Rede caiu: o ESP32 segue medindo. Atualização falhou: volta a versão anterior. Dado antigo nunca aparece como atual.</p></article>
+          <article class="card"><span class="card-badge">Honestidade</span><h3>Implementado ≠ validado</h3><p>A documentação separa o que está no código, o que foi testado em bancada e o que ainda depende de ensaio físico.</p></article>
+        </div>
+        <div class="cards-grid two-cols fixed-two mb-lg">
+          <article class="card"><span class="card-badge success">Segurança • hoje</span><h3>O que já protege a plataforma</h3><ul class="plain-list"><li>Broker com usuário, senha e ACL por tópico: cada placa só usa os tópicos do próprio ID.</li><li>Login JWT de 15 min, refresh rotativo e perfis (visualizador, operador, administrador).</li><li>Firmware com SHA-256, anti-downgrade, token de uso único e rollback.</li><li>Segredos em <code>.env</code> e <code>config.h</code>, fora do Git.</li></ul></article>
+          <article class="card"><span class="card-badge pending">Segurança • roadmap</span><h3>O que falta antes de produção</h3><ul class="plain-list"><li>Criptografia em trânsito: MQTTS (8883) e HTTPS.</li><li>Credencial própria por dispositivo, com revogação.</li><li>Log de auditoria de limites, usuários e firmware.</li><li>Proteção contra repetição de mensagens.</li><li>LGPD: exportação e exclusão de conta e prazo de retenção.</li></ul></article>
+        </div>
+        <p class="page-note">Detalhes em "Segurança e privacidade: estado atual e roadmap" no README. Referência de privacidade: Lei 13.709/2018 (LGPD).</p>
+      </div>
+    </section>
+
     <section id="tecnologias" class="section">
       <div class="container">
-        <div class="section-header"><span class="eyebrow">04 / Tecnologias</span><h2 class="section-title">Tecnologias utilizadas.</h2><p class="section-subtitle">O que usamos em cada camada do projeto e a função de cada tecnologia. Versões indicadas quando fazem diferença.</p></div>
+        <div class="section-header"><span class="eyebrow">05 / Tecnologias</span><h2 class="section-title">Tecnologias utilizadas.</h2><p class="section-subtitle">O que usamos em cada camada do projeto e a função de cada tecnologia. Versões indicadas quando fazem diferença.</p></div>
                 <h3 class="tech-group-title">1. Aplicativo mobile</h3>
                 <div class="table-wrapper">
                     <table class="tech-table tech-layers">

@@ -50,11 +50,13 @@ Na entrega final, a plataforma passou a cobrir todos os requisitos técnicos mí
 10. [Cloud: ingestão, API e alertas (N2)](#cloud-ingestão-api-e-alertas-n2)
 11. [Entrega final: requisitos da plataforma IoT](#entrega-final-requisitos-da-plataforma-iot)
 12. [Limitações conhecidas](#limitações-conhecidas)
-13. [Princípios de engenharia](#princípios-de-engenharia-adotados)
-14. [Organização do repositório](#organização-do-repositório)
-15. [Como reproduzir](#como-reproduzir-o-projeto)
-16. [Roadmap](#roadmap-rumo-à-n2)
-17. [Licença](#licença-e-agradecimentos)
+13. [Segurança e privacidade: estado atual e roadmap](#segurança-e-privacidade-estado-atual-e-roadmap)
+14. [Princípios de engenharia](#princípios-de-engenharia-adotados)
+15. [Organização do repositório](#organização-do-repositório)
+16. [Como reproduzir](#como-reproduzir-o-projeto)
+17. [Roadmap](#roadmap-rumo-à-n2)
+18. [Referências](#referências)
+19. [Licença](#licença-e-agradecimentos)
 
 ---
 
@@ -821,6 +823,40 @@ Esta é a primeira versão do sistema. Estes pontos serão tratados nas próxima
 
 ---
 
+## Segurança e privacidade: estado atual e roadmap
+
+A segurança atual é adequada a um **protótipo em rede local de laboratório**, não a uma instalação em produção. Esta seção separa o que já existe do que falta, para que ninguém confunda uma coisa com a outra.
+
+### O que já está implementado
+
+| Camada | Controle |
+| --- | --- |
+| Dispositivo ↔ broker | Usuário e senha obrigatórios no EMQX; ACL por tópico: cada placa só publica e lê os tópicos do próprio ID (client id = `ESP32_CPD_<MAC>`), e só a plataforma publica comandos |
+| Usuários ↔ API | Login com JWT de 15 min e refresh rotativo guardado só como hash; senhas com PBKDF2-SHA256; nenhuma rota de dados sem autenticação |
+| Autorização (RBAC) | Perfis visualizador, operador e administrador; ações sensíveis (limites, usuários, dispositivos, firmware) só para administrador; não é possível ficar sem administrador ativo |
+| Firmware | OTA com SHA-256, verificação de placa e versão (anti-downgrade), token de download de uso único e rollback automático |
+| Segredos | `.env` e `config.h` fora do Git; portal Wi-Fi do ESP32 protegido por senha própria |
+
+### O que falta (roadmap)
+
+1. **Criptografia em trânsito:** MQTTS (8883) com certificado no broker e HTTPS na API e no download do firmware. Hoje a integridade do firmware é garantida pelo SHA-256, mas o tráfego é legível na rede.
+2. **Credencial por dispositivo:** senha (ou certificado) própria para cada ESP32, em vez de um usuário `dispositivo` compartilhado, com revogação individual.
+3. **Log de auditoria:** registrar quem alterou limites, usuários, dispositivos e firmware, e quando. Hoje só os jobs de OTA guardam autor e horário.
+4. **Proteção contra repetição:** número de sequência ou carimbo de tempo assinado nas mensagens MQTT, para que uma mensagem capturada não possa ser reenviada.
+5. **Gestão de chaves do OTA assinado:** o caminho com manifesto RSA (`SecureOta.h`) já existe; falta definir onde a chave privada fica e quem autoriza versões.
+
+### Privacidade e LGPD
+
+O SentinelaCPD mede o **ambiente**, não pessoas: temperatura, umidade e corrente não são dados pessoais. Os únicos dados pessoais são os dos **usuários da plataforma** (nome, e-mail e o registro de quem reconheceu um alerta ou iniciou uma atualização). Seguindo a Lei Geral de Proteção de Dados (Lei 13.709/2018):
+
+* **Finalidade e minimização:** coletamos só o necessário para login e rastreabilidade das ações; não há telefone, CPF nem localização de pessoas.
+* **Local-first:** os dados ficam no servidor do próprio CPD, sem envio a nuvem de terceiros. A exceção é o aviso pelo Telegram, que leva só o dispositivo e a situação do ambiente, nunca dados de usuários.
+* **Segurança:** senhas nunca são guardadas em texto; sessões expiram e são encerradas ao trocar a senha ou desativar o usuário.
+* **Direitos do titular (a implementar):** exportação e exclusão definitiva da conta. Hoje o administrador só pode desativar o usuário, para preservar o histórico de quem reconheceu alertas.
+* **Retenção (a definir):** prazo para apagar dados brutos antigos (ver [Banco de dados: justificativa](#banco-de-dados-justificativa)).
+
+---
+
 ## Princípios de engenharia adotados
 
 * **Separação de responsabilidades:** o microcontrolador não executa SQL, o banco não conhece o sensor e o broker cuida apenas de mensageria e roteamento.
@@ -828,6 +864,11 @@ Esta é a primeira versão do sistema. Estes pontos serão tratados nas próxima
 * **Proteção de segredos:** variáveis de ambiente em `.env` e parâmetros locais em `config.h`, ambos fora do controle de versão pelo `.gitignore`. Os arquivos `.env.example` e `config.example.h` servem de modelo.
 * **Envio periódico sem `delay`:** um temporizador por software (`millis()`) controla o intervalo de 5 s no laço principal. O cálculo do RMS e a reconexão MQTT ainda são bloqueantes (ver [Limitações](#limitações-conhecidas)).
 * **Infraestrutura como código:** toda a Cloud sobe com um único `docker compose up`, o que permite reproduzir o ambiente em qualquer máquina.
+* **Privacidade desde o projeto:** o sistema mede o ambiente, não pessoas; dados de usuário são mínimos e ficam no servidor local (ver [Segurança e privacidade](#segurança-e-privacidade-estado-atual-e-roadmap)).
+* **Explicabilidade:** alertas usam regras que o operador consegue entender (faixa ASHRAE, histerese e N leituras seguidas). Cada alerta traz uma mensagem com a métrica e o motivo, e guarda a versão da regra que o gerou. Por isso não usamos IA nesta versão (ver [Inteligência artificial: avaliação](#inteligência-artificial-avaliação)).
+* **Acessibilidade:** o estado nunca é informado só por cor: app e dashboard usam texto ("Recente", "Desatualizado", "Em bateria") e ícones; o LED na case dá retorno visual no próprio rack; mensagens de erro indicam o campo a corrigir.
+* **Falhar de forma segura:** se a rede cai, o ESP32 continua medindo; se uma atualização falha, a versão anterior continua rodando; dado antigo nunca é mostrado como atual.
+* **Honestidade de validação:** a documentação separa o que foi implementado, o que foi testado em bancada e o que ainda depende de ensaio físico.
 
 ---
 
@@ -994,6 +1035,20 @@ Veja [mobile/README.md](mobile/README.md). Resumo: na pasta `mobile`, `npm ci`, 
 - [x] `cliente_id` fixo por placa (baseado no MAC), usado também pela ACL.
 - [x] Atualização OTA por manifesto assinado com RSA no firmware (alternativa, desabilitada até haver servidor HTTPS de releases).
 - [x] Avaliação de Redis e de IA documentada (não adotados nesta versão, com justificativa).
+
+---
+
+## Referências
+
+* ASHRAE TC 9.9. *Thermal Guidelines for Data Processing Environments*, 5ª ed. Faixa recomendada de 18 °C a 27 °C para salas de TI.
+* OASIS. *MQTT Version 3.1.1*. Especificação do protocolo de mensagens.
+* Espressif Systems. *ESP-IDF Programming Guide: Over The Air Updates (OTA)* e *App Rollback*.
+* EMQX. *Documentação do EMQX 5.8*: autenticação por banco interno e autorização por arquivo (ACL).
+* Brasil. *Lei nº 13.709/2018 (LGPD)*.
+* OWASP. *IoT Top 10* e *Password Storage Cheat Sheet* (PBKDF2).
+* Weiser, M. *The Computer for the 21st Century*. Scientific American, 1991. Inspiração para computação ambiente: o sistema trabalha em segundo plano e só chama atenção quando precisa.
+
+Como contribuir com o projeto: veja [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
