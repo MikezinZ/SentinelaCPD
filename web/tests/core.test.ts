@@ -116,3 +116,23 @@ test('energia explícita e freshness configurável', async () => {
     assert.equal(freshness({...device, stale_after_seconds: undefined}, 15001, server), 'stale');
   } finally { setScenario('normal'); }
 });
+
+test('administração: usuários, dispositivos e OTA respeitam o perfil', async () => {
+  setScenario('normal');
+  const viewer = await login('viewer');
+  await assert.rejects(viewer.users(), (error: unknown) => error instanceof ApiError && error.status === 403);
+  await assert.rejects(viewer.updateDevice('cpd-01', { name: 'X' }), (error: unknown) => error instanceof ApiError && error.status === 403);
+  const admin = await login('admin');
+  const before = (await admin.users()).items.length;
+  await assert.rejects(admin.createUser({ email: 'ana@empresa.com', name: 'Ana', role: 'operator', password: 'curta' }), (error: unknown) => error instanceof ApiError && error.status === 422);
+  const ana = await admin.createUser({ email: 'ana@empresa.com', name: 'Ana', role: 'operator', password: 'SenhaForte123' });
+  assert.equal((await admin.users()).items.length, before + 1);
+  assert.equal((await admin.updateUser(ana.id, { active: false })).active, false);
+  assert.equal((await admin.updateDevice('cpd-02', { name: 'Rack renomeado' })).name, 'Rack renomeado');
+  const firmware = await admin.uploadFirmware(new Blob([new Uint8Array([0xe9, 1, 2, 3])]));
+  const job = await admin.startOta('cpd-01', firmware.id);
+  assert.equal(job.status, 'sent');
+  const done = (await admin.otaJobs()).items.find(item => item.id === job.id);
+  assert.equal(done?.status, 'success');
+  assert.equal((await admin.device('cpd-01')).firmware_version, firmware.version);
+});

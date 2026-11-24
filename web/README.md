@@ -30,6 +30,13 @@ npm run preview
 - **Conflito de versão:** como Administrador, entre em um rack e selecione Configurar limites. Ative o cenário, salve, recarregue os limites e tente novamente.
 - **Cenários extras:** sem dispositivos, histórico vazio e sessão expirada.
 
+## Administração (perfil administrador)
+
+- **Usuários e dispositivos:** cadastrar usuários, mudar perfil, desativar e redefinir senha; vincular, renomear e desativar dispositivos.
+- **Firmware (OTA):** enviar o `.bin` exportado pela Arduino IDE, instalar em um dispositivo e acompanhar cada etapa (comando enviado, baixando, instalado, concluído, falhou, revertido). Detalhes em "Entrega final" no README principal.
+
+No Modo Demonstração essas telas funcionam com dados simulados em memória.
+
 ## API real
 
 Com o Cloud rodando (`docker compose up -d` na raiz do repositório), crie `.env.local` com `VITE_USE_MOCKS=false`. Em `npm run dev`, o caminho padrão `/api/v2` é repassado pelo proxy do Vite para `VITE_PROXY_TARGET` (padrão `http://localhost:8000`). Para um build publicado em outro endereço, use `VITE_API_BASE=https://SEU_HOST/api/v2` e informe a origem do site em `CORS_ORIGINS` no `.env` do Cloud. Os logins são os usuários cadastrados na API (veja a seção Cloud do README principal). Para implantação estática, configure fallback de rotas para `index.html`.

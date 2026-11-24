@@ -1,5 +1,5 @@
 import { ApiError, freshness, metricKeys, stateOf, validateLimits } from '../contracts';
-import type { Alert, Bucket, Device, Limits, ReadingPoint, Role, Sample, Session, User } from '../contracts';
+import type { Alert, Bucket, Device, DeviceChange, Firmware, Limits, ManagedUser, NewUser, OtaJob, ReadingPoint, Role, Sample, Session, User, UserChange } from '../contracts';
 
 export const scenarios = {
   power: 'Queda de energia (em bateria)',
@@ -33,6 +33,12 @@ let scenario: Scenario = 'normal', changedAt = Date.now(), conflictPending = fal
 const activeTokens = new Map<string, { user: User; expires: number }>();
 const refreshTokens = new Map<string, { user: User; access: string; expires: number }>();
 const limits = new Map<string, Limits>();
+// administração simulada (só em memória)
+const deviceChanges = new Map<string, DeviceChange>();
+const firmwareInstalled = new Map<string, string>();
+const managedUsers: ManagedUser[] = roles.map(role => ({ id: 'demo-' + role, email: demoEmail(role), name: users[role].name, role, active: true, created_at: new Date().toISOString() }));
+const firmwares: Firmware[] = [];
+const otaJobs: OtaJob[] = [];
 const acknowledgments = new Map<string, Pick<Alert, 'acknowledged_at' | 'acknowledged_by' | 'note'>>();
 export function setScenario(value: Scenario) {
   scenario = value;
@@ -78,8 +84,10 @@ function devices(): Device[] {
       humidity_pct: invalid ? null : humidity, current_rms_a: current,
       quality: { temperature: invalid ? 'invalid' : 'ok', humidity: invalid ? 'invalid' : 'ok', current: 'ok' },
     };
+    const override = deviceChanges.get(id) ?? {};
     const device: Device = {
-      id, name, location, enabled: true, firmware_version: '0.2.0', server_time: iso(now),
+      id, name: override.name ?? name, location: override.location ?? location, enabled: override.enabled ?? true,
+      firmware_version: firmwareInstalled.get(id) ?? '0.3.0', server_time: iso(now),
       power_state: primary && scenario === 'power' ? 'battery' : 'mains',
       battery_pct: primary && scenario === 'power' ? 18 : null,
       stale_after_seconds: 15, latest, freshness: 'fresh',
@@ -168,6 +176,8 @@ export async function mockRequest({ path, method, body, token, signal }: MockReq
     acknowledgments.set(alert.id, audit);
     return { ...alert, ...audit };
   }
+  const admin = adminRoute(route, method, body, user);
+  if (admin !== undefined) return admin;
   const [, deviceId, feature] = route.match(/^\/devices\/([^/]+)(?:\/(readings|limits|incidents))?$/) ?? [];
   const device = devices().find(item => item.id === decodeURIComponent(deviceId ?? ''));
   if (!device) throw new ApiError(404, 'Dispositivo não encontrado.');
@@ -195,4 +205,59 @@ export async function mockRequest({ path, method, body, token, signal }: MockReq
   const updated = { ...input, version: current.version + 1 };
   limits.set(device.id, updated);
   return updated;
+}
+
+function adminRoute(route: string, method: string, body: unknown, user: User): unknown {
+  const isAdminRoute = route === '/users' || route.startsWith('/users/') || route === '/firmware' || route === '/ota/jobs'
+    || (route === '/devices' && method === 'POST') || (/^\/devices\/[^/]+$/.test(route) && method === 'PUT') || /^\/devices\/[^/]+\/ota$/.test(route);
+  if (!isAdminRoute) return undefined;
+  if (route === '/firmware' && method === 'GET') return { items: firmwares };
+  if (route === '/firmware' && method === 'POST') {
+    if (user.role !== 'admin') throw new ApiError(403, 'Apenas administradores podem executar esta ação.');
+    return mockUploadFirmware((body as Blob).size, 'Envio simulado');
+  }
+  if (route === '/ota/jobs') {
+    for (const job of otaJobs) if (job.status === 'sent') { job.status = 'success'; job.detail = 'Simulação: nova versão em execução.'; job.finished_at = iso(Date.now()); firmwareInstalled.set(job.device_id, job.version); }
+    return { items: [...otaJobs].reverse() };
+  }
+  if (user.role !== 'admin') throw new ApiError(403, 'Apenas administradores podem executar esta ação.');
+  if (route === '/users' && method === 'GET') return { items: managedUsers };
+  if (route === '/users' && method === 'POST') {
+    const input = body as NewUser;
+    if (!input.password || input.password.length < 8) throw new ApiError(422, 'Revise os campos.', { password: 'A senha precisa ter de 8 a 128 caracteres.' });
+    if (managedUsers.some(item => item.email === input.email.toLowerCase())) throw new ApiError(409, 'Já existe um usuário com este e-mail.', { email: 'E-mail já cadastrado.' });
+    const created: ManagedUser = { id: crypto.randomUUID(), email: input.email.toLowerCase(), name: input.name, role: input.role, active: true, created_at: iso(Date.now()) };
+    managedUsers.push(created);
+    return created;
+  }
+  const userMatch = route.match(/^\/users\/([^/]+)$/);
+  if (userMatch && method === 'PUT') {
+    const target = managedUsers.find(item => item.id === decodeURIComponent(userMatch[1]));
+    if (!target) throw new ApiError(404, 'Usuário não encontrado.');
+    const { name, role, active } = body as UserChange;
+    Object.assign(target, { ...(name ? { name } : {}), ...(role ? { role } : {}), ...(active !== undefined ? { active } : {}) });
+    return target;
+  }
+  if (route === '/devices' && method === 'POST') throw new ApiError(409, 'Na demonstração os dispositivos são fixos.');
+  const deviceMatch = route.match(/^\/devices\/([^/]+)(\/ota)?$/);
+  const id = decodeURIComponent(deviceMatch?.[1] ?? '');
+  const device = devices().find(item => item.id === id);
+  if (!device) throw new ApiError(404, 'Dispositivo não encontrado.');
+  if (!deviceMatch?.[2]) {
+    deviceChanges.set(id, { ...deviceChanges.get(id), ...(body as DeviceChange) });
+    return devices().find(item => item.id === id);
+  }
+  const firmware = firmwares.find(item => item.id === (body as { firmware_id: string }).firmware_id);
+  if (!firmware) throw new ApiError(404, 'Versão de firmware não encontrada.');
+  const job: OtaJob = { id: String(otaJobs.length + 1), device_id: id, firmware_id: firmware.id, version: firmware.version, from_version: device.firmware_version,
+    status: 'sent', detail: 'Comando enviado ao dispositivo.', created_by: user.name, created_at: iso(Date.now()), updated_at: iso(Date.now()), finished_at: null };
+  otaJobs.push(job);
+  return job;
+}
+export function mockUploadFirmware(size: number, name: string): Firmware {
+  const sequence = 4 + firmwares.length;
+  const item: Firmware = { id: String(firmwares.length + 1), version: '0.4.' + firmwares.length, sequence, target: 'esp32', size,
+    sha256: Array.from({ length: 64 }, (_, i) => '0123456789abcdef'[(i * 7 + sequence) % 16]).join(''), notes: name, uploaded_by: 'Admin CPD', uploaded_at: iso(Date.now()) };
+  firmwares.unshift(item);
+  return item;
 }

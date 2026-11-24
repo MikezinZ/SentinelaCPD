@@ -90,3 +90,20 @@ export function powerLabel(device: Device): string {
   const state = device.power_state === 'battery' ? 'Em bateria' : device.power_state === 'mains' ? 'Rede elétrica' : 'Energia desconhecida';
   return state + ' · Bateria ' + (device.battery_pct == null ? 'indisponível' : device.battery_pct + '%');
 }
+
+// ---------------------------------------------------------------- administração
+export type ManagedUser = { id: string; email: string; name: string; role: Role; active: boolean; created_at: string | null };
+export type NewUser = { email: string; name: string; role: Role; password: string };
+export type UserChange = Partial<{ name: string; role: Role; active: boolean; password: string }>;
+export type DeviceChange = Partial<{ name: string; location: string; enabled: boolean }>;
+export type Firmware = {
+  id: string; version: string; sequence: number; target: string; size: number; sha256: string;
+  notes: string; uploaded_by: string | null; uploaded_at: string | null;
+};
+export type OtaStatus = 'queued' | 'sent' | 'downloading' | 'installed' | 'success' | 'failed' | 'rejected' | 'rolled_back' | 'timeout';
+export type OtaJob = {
+  id: string; device_id: string; firmware_id: string; version: string; from_version: string | null;
+  status: OtaStatus; detail: string; created_by: string | null; created_at: string | null;
+  updated_at: string | null; finished_at: string | null;
+};
+export const otaFinished = (status: OtaStatus) => ['success', 'failed', 'rejected', 'rolled_back', 'timeout'].includes(status);

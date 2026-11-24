@@ -1,5 +1,5 @@
 import { ApiError } from '../contracts';
-import type { Alert, AlertPage, AlertState, Device, DevicePage, Limits, ReadingPage, ReadingQuery, Session, User } from '../contracts';
+import type { Alert, AlertPage, AlertState, Device, DeviceChange, DevicePage, Firmware, Limits, ManagedUser, NewUser, OtaJob, ReadingPage, ReadingQuery, Session, User, UserChange } from '../contracts';
 import { mockRequest } from '../mocks/server';
 
 export const useMocks = import.meta.env?.VITE_USE_MOCKS === 'true';
@@ -12,10 +12,11 @@ const query = (params: Record<string, string | undefined>) => {
 type Transport = <T>(path: string, method: string, body: unknown, token: string | null, signal: AbortSignal) => Promise<T>;
 const transport: Transport = async <T>(path: string, method: string, body: unknown, token: string | null, signal: AbortSignal) => {
   if (useMocks) return await mockRequest({ path, method, body, token, signal }) as T;
+  const raw = typeof Blob !== 'undefined' && body instanceof Blob;   // upload do firmware (.bin)
   const response = await fetch(apiBase + path, {
     method, credentials: 'include', signal,
-    headers: { Accept: 'application/json', ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}), ...(token ? { Authorization: 'Bearer ' + token } : {}) },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    headers: { Accept: 'application/json', ...(body !== undefined ? { 'Content-Type': raw ? 'application/octet-stream' : 'application/json' } : {}), ...(token ? { Authorization: 'Bearer ' + token } : {}) },
+    body: body === undefined ? undefined : raw ? body as Blob : JSON.stringify(body),
   });
   if (!response.ok) {
     const envelope = await response.json().catch(() => null);
@@ -38,13 +39,13 @@ export function createApi(send: Transport = transport) {
     access = session.access_token;
     refreshToken = session.refresh_token;
   }
-  async function call<T>(path: string, method = 'GET', body?: unknown, signal?: AbortSignal, token = access): Promise<T> {
-    const timeout = AbortSignal.timeout(10_000);
+  async function call<T>(path: string, method = 'GET', body?: unknown, signal?: AbortSignal, token = access, limit = 10_000): Promise<T> {
+    const timeout = AbortSignal.timeout(limit);
     try {
       return await send<T>(path, method, body, token, signal ? AbortSignal.any([signal, timeout]) : timeout);
     } catch (error) {
       if (signal?.aborted) throw signal.reason;
-      if (timeout.aborted) throw new ApiError(408, 'A solicitação excedeu 10 segundos.');
+      if (timeout.aborted) throw new ApiError(408, `A solicitação excedeu ${limit / 1000} segundos.`);
       if (error instanceof TypeError) throw new ApiError(503, 'Sem conexão com a API.');
       throw error;
     }
@@ -68,16 +69,16 @@ export function createApi(send: Transport = transport) {
       .finally(() => { if (sessionGeneration === generation) refreshInFlight = null; });
     return refreshInFlight;
   }
-  async function request<T>(path: string, method = 'GET', body?: unknown, signal?: AbortSignal) {
+  async function request<T>(path: string, method = 'GET', body?: unknown, signal?: AbortSignal, limit?: number) {
     const sentWith = access, sessionGeneration = generation;
     try {
-      return await call<T>(path, method, body, signal, sentWith);
+      return await call<T>(path, method, body, signal, sentWith, limit);
     } catch (error) {
       if (!(error instanceof ApiError) || error.status !== 401 || signal?.aborted || generation !== sessionGeneration) throw error;
       if (access === sentWith && !await renew()) throw error;
       if (generation !== sessionGeneration || signal?.aborted) throw error;
       try {
-        return await call<T>(path, method, body, signal);
+        return await call<T>(path, method, body, signal, access, limit);
       } catch (retry) {
         if (retry instanceof ApiError && retry.status === 401 && generation === sessionGeneration) {
           clear();
@@ -130,6 +131,16 @@ export function createApi(send: Transport = transport) {
     acknowledge: (id: string, note?: string) => request<Alert>('/alerts/' + encodeURIComponent(id) + '/ack', 'POST', { note }),
     limits: (id: string, signal?: AbortSignal) => request<Limits>(device(id) + '/limits', 'GET', undefined, signal),
     saveLimits: (id: string, limits: Limits) => request<Limits>(device(id) + '/limits', 'PUT', limits),
+    // administração (perfil admin)
+    users: (signal?: AbortSignal) => request<{ items: ManagedUser[] }>('/users', 'GET', undefined, signal),
+    createUser: (user: NewUser) => request<ManagedUser>('/users', 'POST', user),
+    updateUser: (id: string, change: UserChange) => request<ManagedUser>('/users/' + encodeURIComponent(id), 'PUT', change),
+    linkDevice: (id: string, name: string, location: string) => request<Device>('/devices', 'POST', { id, name, location }),
+    updateDevice: (id: string, change: DeviceChange) => request<Device>(device(id), 'PUT', change),
+    firmware: (signal?: AbortSignal) => request<{ items: Firmware[] }>('/firmware', 'GET', undefined, signal),
+    uploadFirmware: (file: Blob, notes?: string) => request<Firmware>('/firmware' + query({ notes: notes || undefined }), 'POST', file, undefined, 60_000),
+    startOta: (deviceId: string, firmwareId: string) => request<OtaJob>(device(deviceId) + '/ota', 'POST', { firmware_id: firmwareId }),
+    otaJobs: (deviceId?: string, signal?: AbortSignal) => request<{ items: OtaJob[] }>('/ota/jobs' + query({ device_id: deviceId }), 'GET', undefined, signal),
   };
 }
 export const api = createApi();

@@ -224,3 +224,12 @@ tbody tr:last-child td { border-bottom: 0; }
   .profile { gap: 5px; font-size: 11px; }
 }
 @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+
+/* administração e firmware */
+.admin-section { display: grid; gap: 12px; margin-bottom: 22px; }
+.admin-section .form-panel, .main > .form-panel { margin-bottom: 18px; }
+.form-panel .hint { color: var(--muted); font-size: 12px; line-height: 1.5; margin: 4px 0 12px; }
+.form-panel h2 + .banner, .form-panel .banner { margin-bottom: 10px; }
+.row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.sidebar nav > span:not(:first-child) { margin-top: 14px; }
+td code, .hint code { font-size: 11px; background: #eef3fa; padding: 1px 4px; border-radius: 4px; }
