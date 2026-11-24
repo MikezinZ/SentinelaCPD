@@ -20,7 +20,8 @@ from typing import Optional
 
 import jwt
 import mysql.connector.pooling
-from fastapi import APIRouter, Depends, Header, Request
+from fastapi import APIRouter, Depends, Request
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.responses import JSONResponse, Response
 
 from schema import LIMITES_PADRAO, migrar
@@ -178,11 +179,15 @@ def nova_sessao(u):
     return {"access_token": access, "refresh_token": refresh, "expires_in": ACCESS_TTL_S, "user": usuario_json(u)}
 
 
-def usuario_atual(authorization: Optional[str] = Header(default=None)):
-    if not authorization or not authorization.lower().startswith("bearer "):
+# HTTPBearer também cria o botão "Authorize" no Swagger (/docs).
+bearer = HTTPBearer(auto_error=False, description="Cole o access_token devolvido por POST /api/v2/auth/login")
+
+
+def usuario_atual(cred: Optional[HTTPAuthorizationCredentials] = Depends(bearer)):
+    if not cred or cred.scheme.lower() != "bearer":
         raise ApiErro(401, "Sessão expirada.")
     try:
-        dados = jwt.decode(authorization[7:].strip(), JWT_SECRET, algorithms=["HS256"])
+        dados = jwt.decode(cred.credentials.strip(), JWT_SECRET, algorithms=["HS256"])
         if dados.get("typ") != "access":
             raise ValueError
     except Exception:

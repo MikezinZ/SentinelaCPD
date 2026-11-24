@@ -1,10 +1,11 @@
 """SentinelaCPD - API REST.
 
 - /api/v2/...  contrato do app mobile e do dashboard web (login, perfis, alertas, limites). Ver v2.py.
+- /api/v2/...  administração: usuários, dispositivos e atualização de firmware (OTA). Ver admin.py.
 - /api/...     rotas v1 (resumo simples, usadas na N2 inicial e para testes rápidos).
 
 Documentação interativa: http://<host>:8000/docs
-Se API_KEY estiver definida, as rotas v1 exigem o cabeçalho X-API-Key.
+As rotas v1 exigem o cabeçalho X-API-Key (se API_KEY estiver definida) ou o token de login da v2.
 """
 import os
 from datetime import datetime
@@ -16,6 +17,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+import admin
 import v2
 
 API_KEY = os.getenv("API_KEY", "")
@@ -52,9 +54,19 @@ def query(sql, params=()):
         conn.close()
 
 
-def verificar_chave(x_api_key: Optional[str] = Header(default=None)):
-    if API_KEY and x_api_key != API_KEY:
-        raise HTTPException(status_code=401, detail="Chave de API inválida ou ausente")
+def verificar_chave(x_api_key: Optional[str] = Header(default=None),
+                    cred: Optional[v2.HTTPAuthorizationCredentials] = Depends(v2.bearer)):
+    """v1 aceita a chave X-API-Key (se API_KEY estiver definida) ou o mesmo login da v2.
+
+    Sem API_KEY, as rotas v1 exigem o token de login: nenhum dado fica aberto sem autenticação.
+    """
+    import hmac
+    if API_KEY and x_api_key and hmac.compare_digest(x_api_key, API_KEY):
+        return
+    try:
+        v2.usuario_atual(cred)
+    except v2.ApiErro:
+        raise HTTPException(status_code=401, detail="Envie o cabeçalho X-API-Key ou faça login (Authorization: Bearer <token>).")
 
 
 app = FastAPI(title="SentinelaCPD API", version="0.2.0")
@@ -70,6 +82,7 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type", "Accept", "X-API-Key"],
 )
 app.include_router(v2.router)
+app.include_router(admin.router)
 
 
 @app.on_event("startup")

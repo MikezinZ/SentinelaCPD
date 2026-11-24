@@ -101,3 +101,33 @@ CREATE TABLE IF NOT EXISTS alertas (
     INDEX idx_alerta_data (aberto_em),
     CONSTRAINT fk_alerta_disp FOREIGN KEY (dispositivo_id) REFERENCES dispositivos(id)
 );
+
+-- ---------------------------------------------------------------- Atualização de firmware (OTA)
+CREATE TABLE IF NOT EXISTS firmwares (
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    versao      VARCHAR(32)  NOT NULL,
+    sequencia   INT          NOT NULL UNIQUE,      -- número crescente gravado no binário
+    alvo        VARCHAR(16)  NOT NULL,             -- placa compatível (esp32)
+    tamanho     INT          NOT NULL,
+    sha256      CHAR(64)     NOT NULL,
+    notas       VARCHAR(255) NULL,
+    enviado_por VARCHAR(100) NULL,
+    criado_em   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS ota_jobs (
+    id             INT AUTO_INCREMENT PRIMARY KEY,
+    dispositivo_id VARCHAR(50)  NOT NULL,
+    firmware_id    INT          NOT NULL,
+    versao_origem  VARCHAR(32)  NULL,
+    status         VARCHAR(20)  NOT NULL DEFAULT 'queued',  -- queued|sent|downloading|installed|success|failed|rejected|rolled_back|timeout
+    detalhe        VARCHAR(255) NULL,
+    token_hash     CHAR(64)     NOT NULL,                   -- token de download (só o hash fica no banco)
+    criado_por     VARCHAR(100) NULL,
+    criado_em      TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    atualizado_em  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    concluido_em   TIMESTAMP    NULL,
+    INDEX idx_ota_disp (dispositivo_id, criado_em),
+    CONSTRAINT fk_ota_disp FOREIGN KEY (dispositivo_id) REFERENCES dispositivos(id),
+    CONSTRAINT fk_ota_fw FOREIGN KEY (firmware_id) REFERENCES firmwares(id)
+);
