@@ -22,6 +22,7 @@
         <a href="#plataforma" class="nav-link">Plataforma</a>
         <a href="#dispositivo" class="nav-link">Dispositivos</a>
         <a href="#aplicativo" class="nav-link">Aplicativo</a>
+        <a href="#tecnologias" class="nav-link">Tecnologias</a>
       </nav>
     </div>
   </header>
@@ -39,18 +40,19 @@
         <dl class="project-metrics">
           <div><dt>5 s</dt><dd>Intervalo nominal de coleta</dd></div>
           <div><dt>200 ms</dt><dd>Janela de cálculo de corrente RMS</dd></div>
-          <div><dt>0.3.0</dt><dd>Versão padrão no código do firmware</dd></div>
+          <div><dt>0.4.0</dt><dd>Versão do firmware, com OTA pela dashboard</dd></div>
         </dl>
         <div class="section-header compact">
           <h2 class="section-title">O projeto hoje</h2>
           <p class="section-subtitle">Implementação, evidências e próximos ensaios apresentados separadamente.</p>
         </div>
-        <div class="cards-grid three-cols">
+        <div class="cards-grid two-cols fixed-two">
           <article class="card"><span class="card-badge success">Implementado no repositório</span><h3>Dispositivo e plataforma</h3><p>Coleta em tarefa própria, portal Wi-Fi, reconexão, contrato MQTT por dispositivo, ingestão, API, aplicativo móvel e dashboard web.</p></article>
           <article class="card"><span class="card-badge info">Evidência de bancada</span><h3>Leituras registradas</h3><p>A N1 documenta ensaios com cargas LED e registros no MySQL. Há confirmação de leitura de temperatura e umidade e reconexão à rede salva nos testes de desenvolvimento.</p></article>
-          <article class="card"><span class="card-badge pending">Validação pendente</span><h3>Bateria e atualização remota</h3><p>Continuidade e autonomia da bateria, circuito de monitoramento da fonte, calibração e OTA com recuperação precisam de ensaios integrados na placa.</p></article>
+          <article class="card"><span class="card-badge success">Implementado no repositório</span><h3>Administração e atualização remota</h3><p>Dashboard com gestão de usuários e dispositivos e atualização de firmware pela plataforma (OTA com SHA-256, anti-downgrade e rollback). Broker MQTT com usuário, senha e ACL por tópico.</p></article>
+          <article class="card"><span class="card-badge pending">Validação pendente</span><h3>Bateria e fonte</h3><p>Continuidade e autonomia da bateria, circuito de monitoramento da fonte (PC817) e calibração da corrente precisam de ensaios integrados na placa.</p></article>
         </div>
-        <p class="page-note">Página de apresentação do projeto. Os registros de bancada abaixo são históricos; este site não recebe telemetria ao vivo. Atualizado em <time datetime="2026-11-23">23 de novembro de 2026</time>.</p>
+        <p class="page-note">Página de apresentação do projeto. Os registros de bancada abaixo são históricos; este site não recebe telemetria ao vivo. Atualizado em <time datetime="2026-11-24">24 de novembro de 2026</time>.</p>
         <a class="text-link" href="images/banner_sentinelacpd.jpg" target="_blank" rel="noopener noreferrer">Abrir o banner do projeto ↗</a>
       </div>
     </section>
@@ -69,14 +71,15 @@
           </ol>
           <p class="page-note">Serviços executáveis com Docker Compose em um servidor da rede local. Uma implantação remota depende de hospedagem, acesso de rede e configuração de segurança.</p>
         </div>
+        <div class="mb-lg"><figure class="evidence-card"><div class="evidence-image-wrapper"><img src="images/arquitetura_plataforma.png" alt="Arquitetura atual: ESP32, EMQX, ingestor, MySQL, API, dashboard, app e Telegram" class="evidence-img" loading="lazy"></div><figcaption class="evidence-caption"><h3>Arquitetura atual — entrega final</h3><p>Dispositivo ↔ broker MQTT ↔ ingestão ↔ banco de dados, e dashboard/app ↔ API. O ESP32 nunca acessa o banco: publica no EMQX e, só durante uma atualização, baixa o firmware da API com um token de uso único.</p></figcaption></figure></div>
         <div class="cards-grid two-cols mb-lg">
-          <article class="card"><span class="card-badge">Mensageria e ingestão</span><h3>Identidade por dispositivo</h3><p>O ID fixo do ESP32 compõe o tópico MQTT. O ingestor valida os campos e grava as leituras, a versão do firmware e os eventos recebidos.</p><ul class="plain-list"><li><code>sentinela/&lt;id&gt;/telemetria</code></li><li><code>sentinela/&lt;id&gt;/evento</code></li><li>Compatibilidade com o tópico legado da N1.</li></ul></article>
+          <article class="card"><span class="card-badge">Mensageria e ingestão</span><h3>Identidade por dispositivo</h3><p>O ID fixo do ESP32 compõe o tópico MQTT. O ingestor valida os campos e grava as leituras, a versão do firmware e os eventos recebidos.</p><ul class="plain-list"><li><code>sentinela/&lt;id&gt;/telemetria</code></li><li><code>sentinela/&lt;id&gt;/evento</code></li><li><code>sentinela/&lt;id&gt;/ota</code> e <code>/cmd/ota</code> (atualização de firmware)</li><li>Usuário, senha e ACL: cada placa só publica e lê os tópicos do próprio ID.</li><li>Compatibilidade com o tópico legado da N1.</li></ul></article>
           <article class="card"><span class="card-badge">Dados e operação</span><h3>Histórico, API e alertas</h3><p>MySQL mantém dispositivos, leituras, eventos, incidentes e alertas. A API FastAPI fornece acesso às interfaces; um serviço de notificações integra os alertas ao Telegram.</p><p class="card-note">O backend recebe eventos de falta e retorno de fonte. Sua geração no equipamento depende do circuito de detecção configurado.</p></article>
         </div>
         <div class="callout-card"><div><h3>Wi-Fi conectado não significa dados entregues</h3><p>A conexão à rede local, o acesso ao broker e a gravação no banco são etapas distintas. O firmware publica em QoS 0; o retorno de publicação não confirma persistência no MySQL. MQTT sem TLS é destinado à bancada; o transporte TLS opcional exige configuração do broker, certificados e credenciais.</p></div></div>
         <details class="reference-details">
           <summary>Ver diagrama e documentação da etapa N1</summary>
-          <figure class="evidence-card"><div class="evidence-image-wrapper"><img src="images/diagrama_sistema.png" alt="Diagrama histórico da arquitetura N1 com integração entre EMQX e MySQL" class="evidence-img" loading="lazy"></div><figcaption class="evidence-caption"><h3>Arquitetura histórica — N1</h3><p>O diagrama registra a integração antiga por Data Bridge. O fluxo atual, apresentado acima, utiliza o ingestor Python, a API e as interfaces.</p></figcaption></figure>
+                    <figure class="evidence-card"><div class="evidence-image-wrapper"><img src="images/diagrama_sistema.png" alt="Diagrama histórico da arquitetura N1 com integração entre EMQX e MySQL" class="evidence-img" loading="lazy"></div><figcaption class="evidence-caption"><h3>Arquitetura histórica — N1</h3><p>O diagrama registra a integração antiga por Data Bridge. O fluxo atual, apresentado acima, utiliza o ingestor Python, a API e as interfaces.</p></figcaption></figure>
         </details>
         <a class="text-link" href="https://github.com/MikezinZ/SentinelaCPD#cloud-ingestão-api-e-alertas-n2" target="_blank" rel="noopener noreferrer">Consultar a documentação da plataforma ↗</a>
       </div>
@@ -104,7 +107,7 @@
         <div class="callout-card mb-lg"><div><h3>Processamento do sinal de corrente</h3><p>O cálculo RMS usa a variação do sinal em relação à média de uma janela de 200 ms e aplica um fator de calibração. Abaixo de 18 unidades ADC de RMS, a leitura é zerada para reduzir o piso de ruído. Isso é processamento de sinal, sem modelo de IA embarcado nesta versão. Corrente zero não comprova falta de tensão, e a medição não fornece diretamente potência ou consumo em kWh.</p></div></div>
         <div class="cards-grid two-cols mb-lg">
           <article class="card"><span class="card-badge pending">Energia • a validar</span><h3>Continuidade e eventos de fonte</h3><p>O código prepara a leitura de tensão e os eventos <code>POWER_LOSS</code> e <code>POWER_RESTORED</code>. São necessários um sinal condicionado de presença de fonte e um circuito adequado de medição da bateria.</p><p class="card-note">No exemplo, os pinos estão em −1 e os dados saem como indisponíveis. O percentual, quando habilitado, é uma estimativa linear, não autonomia garantida. A fila de até quatro eventos é volátil.</p></article>
-          <article class="card"><span class="card-badge pending">OTA • preparação</span><h3>Atualização com verificação</h3><p>Implementação por HTTPS, manifesto assinado com RSA, integridade SHA-256 e gravação no slot inativo. A nova aplicação passa por teste local, com retorno à anterior previsto pelo bootloader com rollback.</p><p class="card-note">OTA desativado no exemplo: faltam configurar hospedagem, certificados, chave pública e detecção de fonte, além de validar atualização e recuperação na placa. Atualização exige alimentação externa confirmada.</p></article>
+          <article class="card"><span class="card-badge success">OTA • pela dashboard</span><h3>Atualização remota de firmware</h3><p>O administrador envia o <code>.bin</code> no dashboard; a API confere placa, versão e SHA-256 e manda o comando por MQTT. O ESP32 baixa o arquivo com token de uso único, confere o hash, grava no slot livre e reinicia. Se a nova versão não confirmar o funcionamento em 90 s, o bootloader volta para a anterior (rollback).</p><p class="card-note">Recusa arquivo inválido, de outra placa ou versão igual/anterior, e só atualiza fora da bateria. Download por HTTP na rede local (integridade pelo SHA-256); HTTPS é o próximo passo. O OTA por manifesto assinado com RSA continua disponível como alternativa.</p></article>
         </div>
         <p class="page-note">Reconexão MQTT com espera progressiva e watchdog foram implementados. Abertura do portal e ciclo OTA são coordenados para evitar execução simultânea. Esses mecanismos não substituem testes integrados de falha.</p>
         <div class="document-links">
@@ -122,9 +125,10 @@
     <section id="aplicativo" class="section section-alt">
       <div class="container">
         <div class="section-header"><span class="eyebrow">03 / Aplicativo</span><h2 class="section-title">Dados para acompanhar e decidir.</h2><p class="section-subtitle">Aplicativo móvel em React Native/Expo e dashboard web em React, com contrato de API compartilhado.</p></div>
-        <div class="cards-grid three-cols mb-lg">
+        <div class="cards-grid two-cols fixed-two mb-lg">
           <article class="card"><span class="card-badge">Acompanhamento</span><h3>Dispositivos e histórico</h3><p>Consulta das métricas, atualização das leituras e histórico com agregações. Estados de dado recente, antigo ou indisponível ajudam a interpretar o que está sendo exibido.</p></article>
           <article class="card"><span class="card-badge">Operação</span><h3>Alertas e incidentes</h3><p>Alertas por limites configurados, reconhecimento com nota e consulta de incidentes de energia. Limites são regras do servidor; não são enviados ao ESP32 nesta versão.</p></article>
+          <article class="card"><span class="card-badge">Administração</span><h3>Usuários, dispositivos e firmware</h3><p>No dashboard, o administrador cadastra usuários, muda perfis, desativa e redefine senhas; vincula, renomeia e desativa dispositivos; envia e instala novas versões de firmware acompanhando cada etapa.</p></article>
           <article class="card"><span class="card-badge">Acesso</span><h3>Login e permissões</h3><p>Perfis de administrador, operador e visualizador, com controle de ações na API. Esse login é independente da senha do portal Wi-Fi do dispositivo.</p></article>
         </div>
         <div class="callout-card mb-lg"><div><h3>Demonstração e dados do equipamento são modos diferentes</h3><p>Os exemplos de configuração do app e do dashboard ativam dados simulados. Para mostrar telemetria real, é necessário desativar os mocks, apontar para uma API acessível e conferir a chegada de leituras novas. Este GitPage apresenta o projeto; ele não hospeda a API nem executa o aplicativo.</p></div></div>
@@ -132,6 +136,11 @@
           <a href="https://github.com/MikezinZ/SentinelaCPD/tree/main/mobile" target="_blank" rel="noopener noreferrer">Aplicativo móvel e execução ↗</a>
           <a href="https://github.com/MikezinZ/SentinelaCPD/tree/main/web" target="_blank" rel="noopener noreferrer">Dashboard web e execução ↗</a>
           <a href="https://github.com/MikezinZ/SentinelaCPD/tree/main/api" target="_blank" rel="noopener noreferrer">API da plataforma ↗</a>
+        </div>
+
+        <div class="cards-grid two-cols fixed-two mb-lg">
+          <figure class="evidence-card"><div class="evidence-image-wrapper"><img src="images/dashboard_firmware_ota.png" alt="Tela de atualização de firmware do dashboard" class="evidence-img" loading="lazy"></div><figcaption class="evidence-caption"><h3>Dashboard › Firmware (OTA)</h3><p>Envio do .bin, versões disponíveis, instalação e histórico de cada atualização, informado pelo próprio dispositivo.</p></figcaption></figure>
+          <figure class="evidence-card"><div class="evidence-image-wrapper"><img src="images/dashboard_administracao.png" alt="Tela de administração de usuários e dispositivos" class="evidence-img" loading="lazy"></div><figcaption class="evidence-caption"><h3>Dashboard › Usuários e dispositivos</h3><p>Cadastro e perfis de usuários; vínculo, nome, local e ativação dos dispositivos.</p></figcaption></figure>
         </div>
 
         <div class="section-header evidence-heading"><h2 class="section-title">Evidência de bancada</h2><p class="section-subtitle">Recorte histórico da N1, em 2 de outubro de 2026. Não é transmissão ao vivo nem ensaio de precisão.</p></div>
@@ -155,6 +164,81 @@
         <details class="reference-details"><summary>Ver registro original no MySQL Workbench</summary>
           <figure class="evidence-card"><div class="evidence-image-wrapper"><img src="images/workbench_log.png" alt="Captura histórica das leituras de temperatura, umidade e corrente no MySQL Workbench" class="evidence-img" loading="lazy"></div><figcaption class="evidence-caption"><h3>Persistência das leituras na N1</h3><p>Registro documentado no repositório. Os valores descrevem o ensaio da época e não garantem precisão metrológica, ausência de perdas ou o estado atual do equipamento.</p></figcaption></figure>
         </details>
+      </div>
+    </section>
+
+    <section id="tecnologias" class="section">
+      <div class="container">
+        <div class="section-header"><span class="eyebrow">04 / Tecnologias</span><h2 class="section-title">Tecnologias utilizadas.</h2><p class="section-subtitle">O que usamos em cada camada do projeto e a função de cada tecnologia. Versões indicadas quando fazem diferença.</p></div>
+                <h3 class="tech-group-title">1. Aplicativo mobile</h3>
+                <div class="table-wrapper">
+                    <table class="tech-table tech-layers">
+                        <thead><tr><th>Característica</th><th>O que usamos</th></tr></thead>
+                        <tbody>
+                            <tr><td>Linguagem de programação</td><td><strong>TypeScript</strong>: tipagem dos contratos da API compartilhada com o dashboard web.</td></tr>
+                            <tr><td>Framework / SDK</td><td><strong>React Native 0.88 com Expo SDK 58</strong> e <strong>Expo Router</strong>: um código para iOS e Android, com navegação por arquivos.</td></tr>
+                            <tr><td>IDE / ambiente de desenvolvimento</td><td><strong>VS Code</strong> e <strong>Expo Go</strong> no celular para testar sem compilar o app.</td></tr>
+                            <tr><td>Bibliotecas / plugins principais</td><td><strong>expo-secure-store</strong> (guarda o token de login no armazenamento seguro do aparelho), <strong>react-native-gifted-charts</strong> (gráfico do histórico), <strong>NativeWind</strong> (estilos) e <strong>lucide-react-native</strong> (ícones). Requisições com <code>fetch</code> nativo.</td></tr>
+                            <tr><td>Integração com o projeto</td><td>Acessa somente a <strong>API REST <code>/api/v2</code></strong> com token JWT. Não fala com o broker nem com o ESP32: telemetria, alertas, histórico e limites chegam pela API.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 class="tech-group-title">2. Sistema embarcado / firmware</h3>
+                <div class="table-wrapper">
+                    <table class="tech-table tech-layers">
+                        <thead><tr><th>Característica</th><th>O que usamos</th></tr></thead>
+                        <tbody>
+                            <tr><td>Placa e microcontrolador</td><td><strong>ESP32 (ESP32-WROOM-32, dual-core Xtensa LX6, 4 MB de flash)</strong> em placa com suporte para bateria 18650. Sensores: <strong>DHT22</strong> (temperatura e umidade), <strong>ZMCT103C</strong> (corrente AC) e <strong>PC817</strong> (presença da fonte; circuito previsto, ainda não instalado na placa).</td></tr>
+                            <tr><td>Linguagem de programação</td><td><strong>C++</strong> (Arduino), com as regras críticas em cabeçalhos testados no PC.</td></tr>
+                            <tr><td>IDE e framework / SDK</td><td><strong>Arduino IDE 2</strong> com o núcleo <strong>arduino-esp32 3.3</strong> (baseado no ESP-IDF 5.5). Perfil alternativo em ESP-IDF puro em <code>firmware-idf/</code>.</td></tr>
+                            <tr><td>Sistema operacional / RTOS</td><td><strong>FreeRTOS: sim</strong> (o do ESP-IDF). A coleta dos sensores roda em uma tarefa própria, e uma fila guarda a última amostra, para que Wi-Fi e MQTT não atrasem a medição.</td></tr>
+                            <tr><td>Bibliotecas e recursos principais</td><td><strong>WiFi</strong> e <strong>WebServer</strong> (portal para configurar a rede pelo celular), <strong>Preferences/NVS</strong> (rede salva), <strong>PubSubClient 2.8</strong> (MQTT), <strong>DHT 1.4.6</strong>, <strong>HTTPClient</strong> + <strong>mbedTLS</strong> (download e SHA-256 do firmware), <strong>esp_ota_ops</strong> (OTA em dois slots com rollback) e <strong>watchdog</strong>.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 class="tech-group-title">3. Plataforma IoT / backend / nuvem</h3>
+                <div class="table-wrapper">
+                    <table class="tech-table tech-layers">
+                        <thead><tr><th>Característica</th><th>O que usamos</th></tr></thead>
+                        <tbody>
+                            <tr><td>Local de hospedagem</td><td><strong>Notebook local</strong> na rede do laboratório. Futuro: VM em nuvem com o mesmo Docker Compose e HTTPS.</td></tr>
+                            <tr><td>Linguagem e framework do backend</td><td><strong>Python 3.12</strong>: <strong>FastAPI</strong> + Uvicorn na API, <strong>paho-mqtt</strong> no ingestor (recebe do broker, grava e gera alertas) e no envio de comandos de OTA.</td></tr>
+                            <tr><td>Serviços e produtos utilizados</td><td><strong>EMQX 5.8</strong> (broker), <strong>MySQL 8.0</strong> (banco), <strong>Telegram Bot API</strong> (avisos de queda de energia, temperatura e dispositivo offline). Nenhum serviço pago de nuvem.</td></tr>
+                            <tr><td>Implantação e orquestração</td><td><strong>Docker Compose</strong> com 5 serviços (emqx, mysql, ingestor, api, notifier) e volumes persistentes. Sobe com <code>docker compose up -d --build</code>.</td></tr>
+                            <tr><td>Persistência e administração</td><td><strong>MySQL</strong> com leituras, eventos, incidentes, alertas, limites, usuários, versões de firmware e histórico de OTA. <strong>Dashboard web</strong> em React + Vite: monitoramento, alertas, usuários, dispositivos e atualização de firmware. Login com <strong>JWT</strong> e perfis (visualizador, operador, administrador). <strong>API REST</strong> documentada no Swagger.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 class="tech-group-title">4. Comunicação e integração</h3>
+                <div class="table-wrapper">
+                    <table class="tech-table tech-layers">
+                        <thead><tr><th>Característica</th><th>O que usamos</th></tr></thead>
+                        <tbody>
+                            <tr><td>Protocolos utilizados</td><td><strong>MQTT 3.1.1</strong> (telemetria, eventos e comandos de OTA), <strong>HTTP/REST</strong> (apps e download do firmware) e <strong>Wi-Fi 2,4 GHz</strong>.</td></tr>
+                            <tr><td>Broker / gateway / servidor</td><td><strong>EMQX 5.8.0</strong> em contêiner. Tópicos por dispositivo: <code>sentinela/&lt;id&gt;/telemetria</code>, <code>/evento</code>, <code>/ota</code> e <code>/cmd/ota</code>.</td></tr>
+                            <tr><td>Formato dos dados</td><td><strong>JSON</strong> nas mensagens MQTT e na API; arquivo binário <code>.bin</code> no download do firmware.</td></tr>
+                            <tr><td>Segurança de comunicação</td><td>Broker com <strong>usuário e senha</strong> e <strong>ACL por tópico</strong> (cada placa só usa os tópicos do próprio ID; só a plataforma envia comandos). API com <strong>JWT</strong> de 15 min e senhas com <strong>PBKDF2</strong>. Firmware com <strong>SHA-256</strong> e token de download de uso único. TLS (MQTTS e HTTPS) é o próximo passo, antes de sair da rede local.</td></tr>
+                            <tr><td>Fluxo entre camadas</td><td>ESP32 → EMQX → ingestor → MySQL → API → app e dashboard. No sentido contrário, dashboard → API → EMQX → ESP32 para a atualização de firmware.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 class="tech-group-title">5. Case / invólucro do produto</h3>
+                <div class="table-wrapper">
+                    <table class="tech-table tech-layers">
+                        <thead><tr><th>Característica</th><th>O que usamos</th></tr></thead>
+                        <tbody>
+                            <tr><td>Software de modelagem 3D</td><td><strong>CadQuery</strong> (modelagem paramétrica em Python) para gerar as peças; <strong>Tinkercad</strong> para visualizar e conferir.</td></tr>
+                            <tr><td>Formato dos arquivos</td><td><strong>STL</strong> (uma peça por arquivo, para o fatiador) e <strong>STEP</strong> (montagem CAD completa).</td></tr>
+                            <tr><td>Processo de fabricação</td><td><strong>Impressão 3D FDM</strong> na Anycubic Kobra 3 V2.</td></tr>
+                            <tr><td>Material e parâmetros relevantes</td><td><strong>PLA</strong>, camada de <strong>0,20 mm</strong>. Oito arquivos STL; cerca de <strong>10 h 30 min</strong> e <strong>257 g</strong> de filamento no total (base 7 h 53 min).</td></tr>
+                            <tr><td>Integração mecânica</td><td>Câmara separada para o DHT22, longe do calor do ESP32; passagem própria para o condutor no ZMCT103C; porta da bateria por fora, com 2 parafusos M3; furo para o LED de status; aberturas de ventilação; placa fixada em pilares.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
       </div>
     </section>
   </main>

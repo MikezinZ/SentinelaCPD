@@ -708,3 +708,9 @@ a:focus-visible, summary:focus-visible { outline: 3px solid #0284c7; outline-off
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* --- Tecnologias utilizadas --- */
+.tech-group-title { font-size: 1.1rem; margin: 2rem 0 .8rem; color: var(--text-main, #0f172a); }
+.tech-layers td:first-child { width: 28%; font-weight: 600; color: var(--text-main, #0f172a); }
+.cards-grid.fixed-two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 760px) { .cards-grid.fixed-two { grid-template-columns: minmax(0, 1fr); } }
