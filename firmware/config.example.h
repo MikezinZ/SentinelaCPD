@@ -16,7 +16,9 @@
 // Deixe vazio para testar somente sensores e Wi-Fi.
 #define MQTT_BROKER ""
 #define MQTT_PORT   1883
-#define MQTT_USER   ""
+// Usuário "dispositivo" do EMQX; senha = MQTT_DEVICE_PASS do .env do Cloud.
+// O client id é o ID da placa, então a ACL só deixa publicar nos tópicos do próprio ID.
+#define MQTT_USER   "dispositivo"
 #define MQTT_PASS   ""
 // {id} vira o ID fixo da placa (ESP32_CPD_<MAC>). O Cloud identifica o dispositivo pelo tópico.
 #define MQTT_TOPIC        "sentinela/{id}/telemetria"
@@ -34,7 +36,10 @@
 #define BATTERY_DIVIDER_RATIO 0.0f
 #define BATTERY_CALIBRATION 1.0f
 
-// --- OTA: habilitar somente com bootloader rollback validado, sensor de fonte e TLS ---
+// --- OTA remota pela dashboard (RemoteOta.h): sempre ativa, sem configuração. ---
+// O ESP32 baixa o .bin da API em http://MQTT_BROKER:8000. Para outra porta: #define OTA_HTTP_PORT 8000
+
+// --- OTA por manifesto assinado (SecureOta.h): habilitar só com bootloader rollback validado, sensor de fonte e TLS ---
 #define OTA_ENABLED 0
 #define OTA_MANIFEST_URL ""
 #define OTA_RELEASE_PREFIX "" // https://servidor/releases/ (barra final obrigatória)

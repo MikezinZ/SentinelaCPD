@@ -11,6 +11,7 @@
 #include "config.h"
 #include "PowerMonitor.h"
 #include "SecureOta.h"
+#include "RemoteOta.h"
 #include "TelemetryContract.h"
 
 #ifndef CONFIG_AP_PASSWORD
@@ -21,6 +22,11 @@
 #ifndef CONFIG_BUTTON_PIN
 #define CONFIG_BUTTON_PIN 0
 #endif
+
+// Etiqueta lida pela plataforma quando o .bin é enviado na dashboard (versão, sequência e placa).
+#define SFW_STR2(x) #x
+#define SFW_STR(x) SFW_STR2(x)
+const char FIRMWARE_TAG[] = "SENTINELA_FW|v=" FIRMWARE_VERSION "|seq=" SFW_STR(FIRMWARE_SEQUENCE) "|target=esp32|";
 
 // Impedir confirmação automática pelo Arduino antes do teste local.
 extern "C" bool verifyRollbackLater() { return true; }
@@ -55,7 +61,7 @@ bool connectionSeen = false, closeScheduled = false;
 uint32_t portalAt = 0, candidateAt = 0, wifiAttemptAt = 0;
 uint32_t offlineAt = 0, closeAt = 0, publishedSeq = 0;
 char deviceId[24], apName[32], csrf[33];
-char telemetryTopic[96], eventTopic[96];
+char telemetryTopic[96], eventTopic[96], otaCommandTopic[96], otaStatusTopic[96];
 PowerEventDetector powerDetector;
 PowerEventQueue powerEvents;
 String notice = "Informe o nome exato da rede Wi-Fi e a senha.";
@@ -323,6 +329,41 @@ void serviceWifi() {
   }
 }
 
+// Resultado das atualizações remotas em sentinela/<id>/ota (lido pelo ingestor).
+void reportOta(uint32_t job, const char* status, const char* detail) {
+  char payload[256];
+  buildOtaStatus(payload, sizeof(payload), job, status, detail, FIRMWARE_VERSION);
+  const bool sent = mqtt.connected() && mqtt.publish(otaStatusTopic, payload, false);
+  Serial.printf("[OTA] job %lu %s: %s%s\n", (unsigned long)job, status, detail, sent ? "" : " (nao publicado)");
+}
+
+void onMqttMessage(char* topic, byte* payload, unsigned int length) {
+  if (strcmp(topic, otaCommandTopic) == 0) remoteOta::onMessage(payload, length);
+}
+
+// Comando de atualização vindo da dashboard. Bloqueia o loop só durante o download (~10-30 s).
+// externalPower: 1 fonte, 0 bateria, -1 desconhecido (PC817 não ligado).
+void serviceRemoteOta(int externalPower) {
+  if (!remoteOta::hasInbox) return;
+  remoteOta::hasInbox = false;
+  OtaCommand command;
+  const esp_partition_t* slot = esp_ota_get_next_update_partition(nullptr);
+  const OtaCheck check = parseOtaCommand(remoteOta::inbox, "esp32", FIRMWARE_SEQUENCE, slot ? slot->size : 0, command);
+  if (check != OTA_ACCEPT) { reportOta(command.job, "rejected", otaCheckText(check)); return; }
+  if (externalPower == 0) {
+    reportOta(command.job, "rejected", "Em bateria: atualizacao so com fonte externa."); return;
+  }
+  if (!secureOta::healthy.load()) {
+    reportOta(command.job, "rejected", "Aguarde 30 s de funcionamento estavel apos ligar e tente de novo."); return;
+  }
+  if (remoteOta::install(command, reportOta, MQTT_BROKER)) {
+    for (int i = 0; i < 10; ++i) { mqtt.loop(); delay(50); }   // entregar o status "installed"
+    mqtt.disconnect();
+    delay(200);
+    ESP.restart();
+  }
+}
+
 void serviceMqtt() {
 #if MQTT_TLS_ENABLED
   if(strlen(MQTT_CA_PEM)<50 || !strlen(MQTT_USER) || !strlen(MQTT_PASS) || time(nullptr)<=1767225600)return;
@@ -349,8 +390,11 @@ void serviceMqtt() {
     }
     mqttRetry.reset();
     Serial.printf("[MQTT] Conectado: %s\n", deviceId);
+    if (!mqtt.subscribe(otaCommandTopic, 1)) Serial.println("[MQTT] Falha ao assinar comandos de OTA.");
   }
   mqtt.loop();
+  remoteOta::serviceBootReport(reportOta);
+  serviceRemoteOta(haveSample ? sample.externalPower : -1);
   const int battery = haveSample ? batteryPercent(sample.batteryVolts) : -1;
   while (!powerEvents.empty()) {
     char eventPayload[160];
@@ -402,7 +446,11 @@ void setup() {
     expandTopic("sentinela/{id}/telemetria", deviceId, telemetryTopic, sizeof(telemetryTopic));
     expandTopic("sentinela/{id}/evento", deviceId, eventTopic, sizeof(eventTopic));
   }
-  Serial.printf("\n[BOOT] firmware etapa1 | ID %s | topicos %s e %s\n", deviceId, telemetryTopic, eventTopic);
+  expandTopic("sentinela/{id}/cmd/ota", deviceId, otaCommandTopic, sizeof(otaCommandTopic));
+  expandTopic("sentinela/{id}/ota", deviceId, otaStatusTopic, sizeof(otaStatusTopic));
+  Serial.printf("\n[BOOT] firmware %s | ID %s | topicos %s e %s\n", FIRMWARE_VERSION, deviceId, telemetryTopic, eventTopic);
+  Serial.printf("[BOOT] %s | particao %s\n", FIRMWARE_TAG, esp_ota_get_running_partition()->label);
+  remoteOta::beginBoot();
   secureOta::begin();
   latestQueue = xQueueCreate(1, sizeof(Sample));
   if (!latestQueue || xTaskCreatePinnedToCore(sampleTask, "sensors", 4096, nullptr, 1, nullptr, 1) != pdPASS) {
@@ -435,6 +483,8 @@ void setup() {
   configTime(0,0,"pool.ntp.org","time.google.com");
 #endif
   mqtt.setServer(MQTT_BROKER, MQTT_PORT);
+  mqtt.setBufferSize(512);          // comando de OTA traz URL e SHA-256
+  mqtt.setCallback(onMqttMessage);
   mqtt.setSocketTimeout(3);
   mqtt.setKeepAlive(20);
   transport.setTimeout(2000);

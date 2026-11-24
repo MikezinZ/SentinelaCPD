@@ -1,10 +1,11 @@
 #pragma once
 // Defaults mantêm o config.h anterior compilável. Configure no arquivo privado.
+// Nova versão para OTA: aumente FIRMWARE_VERSION e FIRMWARE_SEQUENCE (a sequência precisa crescer).
 #ifndef FIRMWARE_VERSION
-#define FIRMWARE_VERSION "0.3.0"
+#define FIRMWARE_VERSION "0.4.0"
 #endif
 #ifndef FIRMWARE_SEQUENCE
-#define FIRMWARE_SEQUENCE 3
+#define FIRMWARE_SEQUENCE 4
 #endif
 #ifndef OTA_ENABLED
 #define OTA_ENABLED 0

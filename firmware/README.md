@@ -85,6 +85,28 @@ PubSubClient continua publicando QoS 0: sucesso de `publish()` não confirma rec
 
 Os métodos de rede são síncronos e podem atrasar o portal/loop de rede; a independência da coleta vem da tarefa separada, não de uma promessa de que todas as bibliotecas são assíncronas. O RMS continua ocupando cerca de 200 ms na tarefa de sensores. O agendamento não é uma garantia de tempo real rígido.
 
+## Atualização pela dashboard (OTA remota, versão 0.4.0)
+
+A partir da 0.4.0, o firmware aceita atualizações iniciadas pela dashboard web (Firmware › Instalar). Não há opção para ligar: basta o MQTT estar configurado.
+
+- **Comando:** chega em `sentinela/<id>/cmd/ota` (só o usuário `plataforma` do broker pode publicar ali). `RemoteOtaPolicy.h` confere placa (`esp32`), sequência maior que a atual (`FIRMWARE_SEQUENCE`), tamanho que cabe no slot e SHA-256 válido.
+- **Pré-condições:** 30 s de funcionamento estável depois de ligar (saúde confirmada por `SecureOta.h`) e não estar em bateria. Sem isso, a placa responde `rejected` e não baixa nada.
+- **Download:** `http://MQTT_BROKER:8000/api/v2/ota/jobs/<n>/firmware.bin?token=…` (porta em `OTA_HTTP_PORT`). O arquivo é gravado no slot OTA livre enquanto o SHA-256 é calculado; o byte inicial precisa ser `0xE9` e o tamanho precisa bater.
+- **Troca:** só depois da verificação o boot muda de slot. A versão em uso nunca é apagada.
+- **Confirmação e rollback:** a nova versão precisa produzir amostras por 30 s. Sem isso em 90 s, o bootloader volta para a anterior, que informa `rolled_back`. Confirmada, informa `success`.
+- **Relatório:** cada etapa vai para `sentinela/<id>/ota` e aparece no histórico da dashboard. No serial, as linhas começam com `[OTA]`.
+- **Identificação:** a constante `FIRMWARE_TAG` (`SENTINELA_FW|v=0.4.0|seq=4|target=esp32|`) fica dentro do `.bin`; é com ela que a plataforma reconhece versão, sequência e placa. Também aparece no boot.
+
+Gerar uma nova versão:
+
+1. Em `ProductConfig.h`, aumente `FIRMWARE_VERSION` (ex.: `"0.4.1"`) e `FIRMWARE_SEQUENCE` (ex.: `5`).
+2. Arduino IDE › Sketch › **Export Compiled Binary**. Use `build/esp32.esp32.esp32/firmware.ino.bin` (não o `merged`).
+3. Envie pela dashboard e instale.
+
+A primeira gravação da 0.4.0 precisa ser pelo USB, porque leva junto a tabela de partições com dois slots de 1,875 MB (`partitions.csv`). O Wi-Fi salvo é preservado (a NVS fica no mesmo endereço).
+
+Compilação verificada com o núcleo ESP32 3.3.12: 1.085.344 bytes (55% do slot de 1.966.080) e 50.792 bytes de variáveis globais. O núcleo 3.3.12 traz o bootloader com rollback habilitado (`CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=1`).
+
 ## Teste de aceite na bancada (pendente de execução física)
 
 | Teste | Como conferir | Resultado esperado |
@@ -143,5 +165,5 @@ Nesta alteração, foram feitas revisão estática da integração e simulação
 
 ## Próximos incrementos
 
-Contrato v2 e qualidade por métrica; TLS e credenciais por dispositivo; fila limitada com deduplicação/ACK após commit; OTA com partições e recuperação; integração definitiva com API/banco. Não instalar hardware adicional para esta etapa.
+Contrato v2 e qualidade por métrica; TLS e senha própria por dispositivo; fila limitada com deduplicação/ACK após commit; OTA com partições e recuperação; integração definitiva com API/banco. Não instalar hardware adicional para esta etapa.
 

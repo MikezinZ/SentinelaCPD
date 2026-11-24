@@ -124,7 +124,10 @@ inline void begin() {
       esp_ota_mark_app_invalid_rollback_and_reboot();
       return;
     }
-    if(attempted && !pendingBoot) {
+    if(attempted && !pendingBoot && attempted==FIRMWARE_SEQUENCE) {
+      // Bootloader sem rollback: a imagem nova já sobe como válida. Não é falha.
+      bootStore.remove("pending");
+    } else if(attempted && !pendingBoot) {
       bootStore.putUInt("rejected",attempted);bootStore.remove("pending");
       Serial.println("[OTA] Release anterior nao confirmado; bloqueado para novas tentativas automaticas.");
     }
