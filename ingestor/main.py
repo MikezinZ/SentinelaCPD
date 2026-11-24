@@ -6,7 +6,10 @@ de alertas da API v2 (alertas.py).
 Tópicos:
   sentinela/<id>/telemetria   {"temperatura": 27.8, "umidade": 45.4, "corrente": 0.8, "bateria": 87, "rede": true}
   sentinela/<id>/evento       {"evento": "POWER_LOSS" | "LAST_GASP" | "POWER_RESTORED", ...}
+  sentinela/<id>/ota          {"job": 7, "status": "downloading" | "installed" | "success" | "failed" | "rejected" | "rolled_back", "detail": "..."}
   esp32/telemetria            (legado da N1, sem id: usa DEVICE_PADRAO)
+
+Dispositivos desativados pela dashboard (dispositivos.ativo = 0) têm os dados descartados.
 """
 import json
 import os
@@ -21,6 +24,8 @@ from schema import migrar
 
 MQTT_HOST = os.getenv("MQTT_HOST", "localhost")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
+MQTT_USER = os.getenv("MQTT_USER", "")       # usuário "plataforma" do EMQX (ver emqx/acl.conf)
+MQTT_PASS = os.getenv("MQTT_PASS", "")
 DEVICE_PADRAO = os.getenv("DEVICE_PADRAO", "ESP32_CPD_01")
 STALE_ALERT_S = int(os.getenv("STALE_ALERT_S", "60"))   # sem dados além disso = alerta telemetry_stale
 
@@ -55,7 +60,55 @@ def num(d, chave, minimo, maximo):
 
 
 def garantir_dispositivo(cur, disp):
+    """Cadastra o dispositivo no primeiro contato. Devolve False se ele foi desativado pelo admin."""
     cur.execute("INSERT IGNORE INTO dispositivos (id) VALUES (%s)", (disp,))
+    cur.execute("SELECT ativo FROM dispositivos WHERE id=%s", (disp,))
+    linha = cur.fetchone()
+    return bool(linha and linha[0])
+
+
+# ----------------------------------------------------------------- atualização de firmware (OTA)
+STATUS_OTA = {"downloading", "installed", "success", "failed", "rejected", "rolled_back"}
+OTA_FINAIS = ("success", "failed", "rejected", "rolled_back", "timeout")
+OTA_TIMEOUT_S = int(os.getenv("OTA_TIMEOUT_S", "600"))   # sem conclusão nesse prazo = timeout
+
+
+def tratar_ota(disp, d):
+    status, job = d.get("status"), d.get("job")
+    if status not in STATUS_OTA or not isinstance(job, int):
+        print(f"[ota] mensagem inválida: {d}")
+        return
+    detalhe = str(d.get("detail") or "")[:255] or None
+    cur = conn().cursor()
+    final = status in OTA_FINAIS
+    # Só atualiza jobs ainda abertos e do próprio dispositivo (o tópico identifica quem enviou).
+    cur.execute(
+        "UPDATE ota_jobs SET status=%s, detalhe=COALESCE(%s, detalhe), concluido_em=IF(%s, NOW(), NULL) "
+        "WHERE id=%s AND dispositivo_id=%s AND status NOT IN ('success','failed','rejected','rolled_back','timeout')",
+        (status, detalhe, final, job, disp),
+    )
+    if cur.rowcount and status == "success" and isinstance(d.get("version"), str):
+        cur.execute("UPDATE dispositivos SET firmware=%s WHERE id=%s", (d["version"][:32], disp))
+    cur.close()
+    print(f"[ota] {disp} job={job} {status} {detalhe or ''}")
+
+
+def confirmar_ota_por_versao(cur, disp, versao):
+    """A telemetria com a nova versão também confirma o job (caso a mensagem 'success' se perca)."""
+    cur.execute(
+        "UPDATE ota_jobs j JOIN firmwares f ON f.id = j.firmware_id "
+        "SET j.status='success', j.detalhe='Nova versão confirmada pela telemetria.', j.concluido_em=NOW() "
+        "WHERE j.dispositivo_id=%s AND j.status='installed' AND f.versao=%s",
+        (disp, versao),
+    )
+
+
+def expirar_ota(cur):
+    cur.execute(
+        "UPDATE ota_jobs SET status='timeout', detalhe='Sem resposta do dispositivo no prazo.', concluido_em=NOW() "
+        "WHERE status IN ('queued','sent','downloading','installed') AND criado_em < NOW() - INTERVAL %s SECOND",
+        (OTA_TIMEOUT_S,),
+    )
 
 
 def tratar_telemetria(disp, d):
@@ -70,7 +123,9 @@ def tratar_telemetria(disp, d):
         print(f"[telemetria] descartada (sem valores válidos): {d}")
         return
     cur = conn().cursor()
-    garantir_dispositivo(cur, disp)
+    if not garantir_dispositivo(cur, disp):
+        cur.close()
+        return   # dispositivo desativado na dashboard
     cur.execute(
         "INSERT INTO leituras (dispositivo_id, temperatura, umidade, corrente, bateria) "
         "VALUES (%s,%s,%s,%s,%s)",
@@ -81,6 +136,7 @@ def tratar_telemetria(disp, d):
         cur.execute("UPDATE dispositivos SET energia=%s WHERE id=%s", ("mains" if rede else "battery", disp))
     if fw:   # versão do firmware, exibida no app e no web
         cur.execute("UPDATE dispositivos SET firmware=%s WHERE id=%s", (fw, disp))
+        confirmar_ota_por_versao(cur, disp, fw)
     try:
         motor.telemetria(cur, disp, temp, umid, corr, bat)
     except Exception as e:  # alerta nunca pode impedir a gravação da leitura
@@ -95,7 +151,9 @@ def tratar_evento(disp, d):
         print(f"[evento] tipo inválido: {d}")
         return
     cur = conn().cursor()
-    garantir_dispositivo(cur, disp)
+    if not garantir_dispositivo(cur, disp):
+        cur.close()
+        return
     cur.execute(
         "INSERT INTO eventos (dispositivo_id, tipo, payload) VALUES (%s,%s,%s)",
         (disp, tipo, json.dumps(d)),
@@ -128,7 +186,8 @@ def tratar_evento(disp, d):
 
 def on_connect(client, userdata, flags, reason_code, properties):
     print(f"[mqtt] conectado ({reason_code})")
-    client.subscribe([("sentinela/+/telemetria", 0), ("sentinela/+/evento", 1), ("esp32/telemetria", 0)])
+    client.subscribe([("sentinela/+/telemetria", 0), ("sentinela/+/evento", 1), ("sentinela/+/ota", 1),
+                      ("esp32/telemetria", 0)])
 
 
 def on_message(client, userdata, msg):
@@ -143,6 +202,8 @@ def on_message(client, userdata, msg):
             tratar_telemetria(partes[1], d)
         elif len(partes) == 3 and partes[2] == "evento":
             tratar_evento(partes[1], d)
+        elif len(partes) == 3 and partes[2] == "ota":
+            tratar_ota(partes[1], d)
     except Exception as e:  # uma mensagem ruim não pode derrubar o serviço
         print(f"[erro] {msg.topic}: {e}")
 
@@ -156,6 +217,7 @@ def vigiar_silencio():
                 c = mysql.connector.connect(**DB, autocommit=True)
             cur = c.cursor()
             motor.verificar_silencio(cur, STALE_ALERT_S)
+            expirar_ota(cur)
             cur.close()
         except Exception as e:
             print(f"[alerta] verificação de silêncio falhou: {e}")
@@ -175,6 +237,8 @@ def main():
 
     threading.Thread(target=vigiar_silencio, daemon=True).start()
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="sentinela-ingestor")
+    if MQTT_USER:
+        client.username_pw_set(MQTT_USER, MQTT_PASS)
     client.on_connect = on_connect
     client.on_message = on_message
     client.reconnect_delay_set(min_delay=1, max_delay=30)
