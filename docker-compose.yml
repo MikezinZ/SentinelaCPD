@@ -7,8 +7,31 @@ services:
       - "1883:1883"     # MQTT (ESP32)
       - "8083:8083"     # MQTT sobre WebSocket (cliente do dashboard)
       - "18083:18083"   # Dashboard do EMQX
+    environment:
+      # Segurança do broker (RF09): ninguém conecta sem usuário e senha e cada um só usa os
+      # tópicos permitidos em emqx/acl.conf. Usuários "plataforma" e "dispositivo" são criados
+      # na primeira subida com as senhas do .env (trocar depois: Dashboard > Access Control).
+      EMQX_AUTHENTICATION__1__MECHANISM: password_based
+      EMQX_AUTHENTICATION__1__BACKEND: built_in_database
+      EMQX_AUTHENTICATION__1__USER_ID_TYPE: username
+      EMQX_AUTHENTICATION__1__PASSWORD_HASH_ALGORITHM__NAME: sha256
+      EMQX_AUTHENTICATION__1__PASSWORD_HASH_ALGORITHM__SALT_POSITION: suffix
+      EMQX_AUTHENTICATION__1__BOOTSTRAP_FILE: /opt/emqx/data/mqtt-usuarios.csv
+      EMQX_AUTHENTICATION__1__BOOTSTRAP_TYPE: plain
+      EMQX_AUTHORIZATION__NO_MATCH: deny
+      # Senha do admin do dashboard do EMQX (vale só para volume novo; senão, troque pela tela)
+      EMQX_DASHBOARD__DEFAULT_PASSWORD: ${EMQX_DASHBOARD_PASS:-public}
+      MQTT_PLATFORM_PASS: ${MQTT_PLATFORM_PASS:?Defina MQTT_PLATFORM_PASS no .env}
+      MQTT_DEVICE_PASS: ${MQTT_DEVICE_PASS:?Defina MQTT_DEVICE_PASS no .env}
+    # Gera a lista de usuários a partir do .env (o arquivo fica só no volume, fora do Git).
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        printf 'user_id,password,is_superuser\nplataforma,%s,false\ndispositivo,%s,false\n' "$$MQTT_PLATFORM_PASS" "$$MQTT_DEVICE_PASS" > /opt/emqx/data/mqtt-usuarios.csv
+        exec /usr/bin/docker-entrypoint.sh /opt/emqx/bin/emqx foreground
     volumes:
       - emqx_data:/opt/emqx/data
+      - ./emqx/acl.conf:/opt/emqx/etc/acl.conf:ro
 
   mysql:
     image: mysql:8.0
@@ -43,6 +66,8 @@ services:
     environment:
       MQTT_HOST: emqx
       MQTT_PORT: 1883
+      MQTT_USER: plataforma
+      MQTT_PASS: ${MQTT_PLATFORM_PASS}
       DB_HOST: mysql
       DB_NAME: ${MYSQL_DATABASE}
       DB_USER: ${MYSQL_USER}
@@ -90,7 +115,17 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       STALE_AFTER_S: ${STALE_AFTER_S:-15}
       CORS_ORIGINS: ${CORS_ORIGINS:-}
+      # OTA: a API publica o comando no broker e guarda os .bin no volume firmware_data
+      MQTT_HOST: emqx
+      MQTT_PORT: 1883
+      MQTT_USER: plataforma
+      MQTT_PASS: ${MQTT_PLATFORM_PASS}
+      FIRMWARE_DIR: /data/firmware
+      OTA_BASE_URL: ${OTA_BASE_URL:-}
+    volumes:
+      - firmware_data:/data/firmware
 
 volumes:
   emqx_data:
   mysql_data:
+  firmware_data:
